@@ -1,0 +1,225 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * SARTISTIC design system — premium Mehndi brand.
+ * Palette: deep mehndi brown, warm ivory, muted terracotta, antique gold, charcoal.
+ * All colours are oklch tokens. Never hardcode colours in components.
+ */
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+
+  --font-serif: "Cormorant Garamond", ui-serif, Georgia, serif;
+  --font-sans: "Jost", ui-sans-serif, system-ui, sans-serif;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-gold: var(--gold);
+  --color-gold-foreground: var(--gold-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+:root {
+  --radius: 0.25rem;
+
+  --background: oklch(0.973 0.013 84);
+  --foreground: oklch(0.255 0.015 55);
+
+  --card: oklch(0.987 0.008 86);
+  --card-foreground: oklch(0.255 0.015 55);
+  --popover: oklch(0.987 0.008 86);
+  --popover-foreground: oklch(0.255 0.015 55);
+
+  --primary: oklch(0.335 0.058 52);
+  --primary-foreground: oklch(0.973 0.013 84);
+
+  --secondary: oklch(0.93 0.018 82);
+  --secondary-foreground: oklch(0.335 0.058 52);
+
+  --muted: oklch(0.945 0.014 83);
+  --muted-foreground: oklch(0.505 0.024 60);
+
+  --accent: oklch(0.585 0.108 40);
+  --accent-foreground: oklch(0.985 0.008 86);
+
+  --gold: oklch(0.755 0.072 80);
+  --gold-foreground: oklch(0.255 0.015 55);
+
+  --destructive: oklch(0.505 0.16 27);
+  --destructive-foreground: oklch(0.985 0.008 86);
+
+  --border: oklch(0.885 0.018 80);
+  --input: oklch(0.885 0.018 80);
+  --ring: oklch(0.585 0.108 40);
+
+  --chart-1: oklch(0.335 0.058 52);
+  --chart-2: oklch(0.585 0.108 40);
+  --chart-3: oklch(0.755 0.072 80);
+  --chart-4: oklch(0.505 0.024 60);
+  --chart-5: oklch(0.45 0.07 30);
+
+  --sidebar: oklch(0.295 0.04 52);
+  --sidebar-foreground: oklch(0.955 0.012 84);
+  --sidebar-primary: oklch(0.755 0.072 80);
+  --sidebar-primary-foreground: oklch(0.255 0.015 55);
+  --sidebar-accent: oklch(0.355 0.05 50);
+  --sidebar-accent-foreground: oklch(0.973 0.013 84);
+  --sidebar-border: oklch(0.38 0.04 52);
+  --sidebar-ring: oklch(0.755 0.072 80);
+
+  --gradient-ivory: linear-gradient(
+    180deg,
+    oklch(0.985 0.01 86) 0%,
+    oklch(0.955 0.016 82) 100%
+  );
+  --gradient-overlay: linear-gradient(
+    100deg,
+    color-mix(in oklab, var(--primary) 78%, transparent) 0%,
+    color-mix(in oklab, var(--primary) 30%, transparent) 55%,
+    transparent 100%
+  );
+  --shadow-soft: 0 1px 2px color-mix(in oklab, var(--foreground) 6%, transparent),
+    0 12px 32px -18px color-mix(in oklab, var(--foreground) 30%, transparent);
+  --shadow-lift: 0 18px 48px -24px color-mix(in oklab, var(--primary) 45%, transparent);
+  --ease-silk: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.dark {
+  --background: oklch(0.205 0.018 55);
+  --foreground: oklch(0.955 0.012 84);
+  --card: oklch(0.245 0.02 54);
+  --card-foreground: oklch(0.955 0.012 84);
+  --popover: oklch(0.245 0.02 54);
+  --popover-foreground: oklch(0.955 0.012 84);
+  --primary: oklch(0.8 0.05 72);
+  --primary-foreground: oklch(0.22 0.018 55);
+  --secondary: oklch(0.3 0.025 55);
+  --secondary-foreground: oklch(0.955 0.012 84);
+  --muted: oklch(0.3 0.025 55);
+  --muted-foreground: oklch(0.72 0.02 70);
+  --accent: oklch(0.63 0.1 40);
+  --accent-foreground: oklch(0.985 0.008 86);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 16%);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  .font-display {
+    font-family: var(--font-serif);
+    font-weight: 300;
+    letter-spacing: -0.01em;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--accent) 25%, transparent);
+  }
+}
+
+@utility eyebrow {
+  font-size: 0.6875rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--color-muted-foreground);
+}
+
+@utility shadow-soft {
+  box-shadow: var(--shadow-soft);
+}
+
+@utility shadow-lift {
+  box-shadow: var(--shadow-lift);
+}
+
+@utility gradient-overlay {
+  background-image: var(--gradient-overlay);
+}
+
+@utility rule-gold {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklab, var(--gold) 80%, transparent),
+    transparent
+  );
+}
+
+@layer components {
+  .reveal {
+    opacity: 0;
+    transform: translateY(18px);
+    transition:
+      opacity 0.9s var(--ease-silk),
+      transform 0.9s var(--ease-silk);
+  }
+
+  .reveal.is-visible {
+    opacity: 1;
+    transform: none;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reveal {
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
+  }
+}
