@@ -43,7 +43,7 @@ export function Footer() {
           </p>
           <div className="mt-6 flex gap-3">
             <a
-              href="https://instagram.com"
+              href="https://instagram.com/sartistic02"
               target="_blank"
               rel="noreferrer"
               aria-label="Instagram"

@@ -2,13 +2,14 @@ import { defineConfig } from "vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
-import tsConfigPaths from "vite-tsconfig-paths";
 import { nitro } from "nitro/vite";
 
 export default defineConfig(({ command }) => ({
   server: { host: "::", port: 8080 },
   css: { transformer: "lightningcss" },
   resolve: {
+    // Native tsconfig "paths" support (replaces vite-tsconfig-paths).
+    tsconfigPaths: true,
     alias: { "@": `${process.cwd()}/src` },
     dedupe: [
       "react",
@@ -21,7 +22,8 @@ export default defineConfig(({ command }) => ({
   },
   plugins: [
     tailwindcss(),
-    tsConfigPaths({ projects: ["./tsconfig.json"] }),
+    // Must come before viteReact(): it includes the TanStack Router plugin,
+    // which has to run before React's JSX transform.
     tanstackStart({
       // Use src/server.ts (our SSR error wrapper) as the server entry.
       server: { entry: "server" },
