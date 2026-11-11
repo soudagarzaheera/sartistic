@@ -1,21 +1,41 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { formatDate, formatPrice, ORDER_STATUSES, titleCase } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
+// Poll for up to 3 minutes after checkout while the payment is confirmed
+// (by the verification call or, as a fallback, the Razorpay webhook).
+const CONFIRM_POLL_MS = 5000;
+const CONFIRM_WINDOW_MS = 3 * 60 * 1000;
+
 export const Route = createFileRoute("/account/orders/$id")({
+  // `placed` is set when arriving straight from checkout.
+  validateSearch: (search: Record<string, unknown>): { placed?: boolean } =>
+    search["placed"] === true || search["placed"] === "true" ? { placed: true } : {},
   component: OrderDetail,
 });
 
 function OrderDetail() {
   const { id } = Route.useParams();
+  const { placed } = Route.useSearch();
   const { user } = useAuth();
+
+  const [confirmWindowOver, setConfirmWindowOver] = useState(false);
+  useEffect(() => {
+    if (!placed) return;
+    const timer = setTimeout(() => setConfirmWindowOver(true), CONFIRM_WINDOW_MS);
+    return () => clearTimeout(timer);
+  }, [placed]);
+  const checking = Boolean(placed) && !confirmWindowOver;
 
   const order = useQuery({
     queryKey: ["order", id],
     enabled: Boolean(user),
+    refetchInterval: (query) =>
+      checking && query.state.data?.payment_status === "pending" ? CONFIRM_POLL_MS : false,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("orders")
@@ -54,6 +74,12 @@ function OrderDetail() {
       </Link>
       <h2 className="mt-4 font-display text-3xl">{data.order_number}</h2>
       <p className="text-sm text-muted-foreground">Placed {formatDate(data.created_at)}</p>
+
+      <PaymentBanner
+        placed={Boolean(placed)}
+        paymentStatus={data.payment_status}
+        stillChecking={checking}
+      />
 
       <div className="mt-8 flex flex-wrap gap-2">
         {timeline.map((status, i) => (
@@ -129,6 +155,50 @@ function OrderDetail() {
         </div>
       </div>
     </section>
+  );
+}
+
+function PaymentBanner({
+  placed,
+  paymentStatus,
+  stillChecking,
+}: {
+  placed: boolean;
+  paymentStatus: string;
+  stillChecking: boolean;
+}) {
+  let tone = "border-border";
+  let title: string;
+  let body: string;
+
+  if (paymentStatus === "paid") {
+    if (!placed) return null;
+    tone = "border-accent";
+    title = "Thank you — your order is confirmed";
+    body = "We've received your payment. You'll find all your order details below.";
+  } else if (paymentStatus === "pending") {
+    if (placed && stillChecking) {
+      title = "Confirming your payment…";
+      body = "This usually takes a few seconds. This page will update automatically.";
+    } else {
+      title = "Payment pending";
+      body =
+        "We haven't received confirmation of a payment for this order yet. If money was deducted, it will be confirmed automatically — or contact us with your order number.";
+    }
+  } else if (paymentStatus === "failed") {
+    tone = "border-destructive";
+    title = "Payment unsuccessful";
+    body =
+      "This payment didn't go through and you have not been charged for it. Please place the order again or contact us for help.";
+  } else {
+    return null;
+  }
+
+  return (
+    <div role="status" aria-live="polite" className={cn("mt-6 border p-5", tone)}>
+      <p className="font-display text-xl">{title}</p>
+      <p className="mt-1 text-sm text-muted-foreground">{body}</p>
+    </div>
   );
 }
 

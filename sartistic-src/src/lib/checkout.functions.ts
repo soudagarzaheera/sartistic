@@ -28,6 +28,20 @@ const createOrderSchema = z.object({
 const SHIPPING_FEE = 79;
 const FREE_SHIPPING_ABOVE = 999;
 
+/**
+ * Loads the service-role Supabase client. Only ever call this from inside a
+ * server function handler: the dynamic import keeps client.server.ts (and the
+ * service-role key it reads) out of the browser bundle.
+ *
+ * Customers have no UPDATE policy on `orders` by design, so payment-state
+ * changes go through this client — always after the order's ownership has
+ * been checked against the authenticated user, and always scoped by user_id.
+ */
+async function getSupabaseAdmin() {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  return supabaseAdmin;
+}
+
 function orderNumber() {
   const now = new Date();
   const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
@@ -199,10 +213,25 @@ export const createCheckoutOrder = createServerFn({ method: "POST" })
     }
 
     const razorpayOrder = (await response.json()) as { id: string };
-    await supabase
+
+    // The order was inserted above by this user's RLS-scoped client, so it is
+    // theirs; the user_id filter re-asserts that for the privileged write.
+    const supabaseAdmin = await getSupabaseAdmin();
+    const { data: linked, error: linkError } = await supabaseAdmin
       .from("orders")
       .update({ razorpay_order_id: razorpayOrder.id })
-      .eq("id", order.id);
+      .eq("id", order.id)
+      .eq("user_id", userId)
+      .eq("payment_status", "pending")
+      .select("id");
+    if (linkError || !linked || linked.length !== 1) {
+      console.error(
+        `[checkout] Failed to save razorpay_order_id for order ${order.id}: ${
+          linkError?.message ?? `${linked?.length ?? 0} rows updated`
+        }`,
+      );
+      throw new Error("Payment could not be started. Please try again in a moment.");
+    }
 
     return {
       orderId: order.id,
@@ -223,19 +252,6 @@ const verifySchema = z.object({
   razorpaySignature: z.string().min(1).max(200),
 });
 
-async function hmacSha256Hex(secret: string, message: string) {
-  const enc = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    "raw",
-    enc.encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(message));
-  return [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
 /** Verifies the Razorpay signature before marking an order paid. */
 export const verifyCheckoutPayment = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -245,51 +261,80 @@ export const verifyCheckoutPayment = createServerFn({ method: "POST" })
     const keySecret = process.env["RAZORPAY_KEY_SECRET"];
     if (!keySecret) throw new Error("Payments are not configured yet.");
 
-    const { data: order } = await supabase
+    // Ownership check: read through the user's RLS-scoped client AND compare
+    // user_id explicitly, before any privileged write happens.
+    const { data: order, error: readError } = await supabase
       .from("orders")
       .select("id, user_id, payment_status, razorpay_order_id, order_number")
       .eq("id", data.orderId)
       .maybeSingle();
+    if (readError) {
+      console.error(`[checkout] Failed to load order ${data.orderId}: ${readError.message}`);
+      throw new Error(
+        "We couldn't confirm your payment. Please contact us with your order number.",
+      );
+    }
     if (!order || order.user_id !== userId) throw new Error("Order not found.");
     if (order.payment_status === "paid") {
       // Idempotent: never process the same payment twice.
       return { ok: true, orderNumber: order.order_number };
     }
-    if (order.razorpay_order_id !== data.razorpayOrderId) {
+    if (!order.razorpay_order_id || order.razorpay_order_id !== data.razorpayOrderId) {
+      console.error(
+        `[checkout] Razorpay order mismatch for order ${order.id}: stored=${
+          order.razorpay_order_id ?? "null"
+        } received=${data.razorpayOrderId}`,
+      );
       throw new Error("Payment reference mismatch.");
     }
+
+    // Loaded lazily: server-only module (service-role client).
+    const { hmacSha256Hex, timingSafeEqualHex, markOrderPaid } =
+      await import("@/lib/payments.server");
 
     const expected = await hmacSha256Hex(
       keySecret,
       `${data.razorpayOrderId}|${data.razorpayPaymentId}`,
     );
-    if (expected !== data.razorpaySignature) {
-      await supabase.from("orders").update({ payment_status: "failed" }).eq("id", order.id);
+    if (!timingSafeEqualHex(expected, data.razorpaySignature)) {
+      // Left as "pending" on purpose: a misconfigured secret would otherwise
+      // permanently mark genuinely captured payments as failed.
+      console.error(
+        `[checkout] Signature verification failed for order ${order.id} (payment ${data.razorpayPaymentId})`,
+      );
       throw new Error("We couldn't verify this payment. You have not been charged twice.");
     }
 
-    await supabase
-      .from("orders")
-      .update({
-        payment_status: "paid",
-        status: "confirmed",
-        razorpay_payment_id: data.razorpayPaymentId,
-      })
-      .eq("id", order.id);
+    // Shared with the webhook. Conditional on payment_status pending/failed
+    // (never paid/refunded) and scoped to this customer, so duplicate or
+    // concurrent verification requests can't double-process the order.
+    let result: Awaited<ReturnType<typeof markOrderPaid>>;
+    try {
+      result = await markOrderPaid({
+        orderId: order.id,
+        razorpayOrderId: data.razorpayOrderId,
+        razorpayPaymentId: data.razorpayPaymentId,
+        userId,
+      });
+    } catch (error) {
+      console.error(`[checkout] ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error(
+        "We couldn't confirm your payment. Please contact us with your order number.",
+      );
+    }
+
+    if (result.outcome === "not_payable") {
+      console.error(
+        `[checkout] Verified payment ${data.razorpayPaymentId} but order ${order.id} is payment_status=${result.paymentStatus} status=${result.status} — needs manual review`,
+      );
+      throw new Error(
+        "We couldn't confirm your payment. Please contact us with your order number.",
+      );
+    }
 
     return { ok: true, orderNumber: order.order_number };
   });
 
-/** Marks a pending order failed when the customer abandons the payment sheet. */
-export const markCheckoutFailed = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((data: unknown) => z.object({ orderId: z.string().uuid() }).parse(data))
-  .handler(async ({ data, context }) => {
-    await context.supabase
-      .from("orders")
-      .update({ payment_status: "failed" })
-      .eq("id", data.orderId)
-      .eq("user_id", context.userId)
-      .eq("payment_status", "pending");
-    return { ok: true };
-  });
+// Note: there is intentionally no "mark failed on dismiss" function. Closing
+// the Checkout window doesn't prove a payment failed (UPI and some bank flows
+// complete afterwards); the Razorpay webhook records failures instead.

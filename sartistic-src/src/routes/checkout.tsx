@@ -9,11 +9,7 @@ import { Label } from "@/components/ui/label";
 import { formatPrice } from "@/lib/format";
 import { useCart } from "@/hooks/useCart";
 import { useAuth } from "@/hooks/useAuth";
-import {
-  createCheckoutOrder,
-  markCheckoutFailed,
-  verifyCheckoutPayment,
-} from "@/lib/checkout.functions";
+import { createCheckoutOrder, verifyCheckoutPayment } from "@/lib/checkout.functions";
 
 export const Route = createFileRoute("/checkout")({
   head: () => ({
@@ -64,7 +60,6 @@ function Checkout() {
   const { user, loading } = useAuth();
   const createOrder = useServerFn(createCheckoutOrder);
   const verifyPayment = useServerFn(verifyCheckoutPayment);
-  const markFailed = useServerFn(markCheckoutFailed);
 
   const [coupon, setCoupon] = useState("");
   const [busy, setBusy] = useState(false);
@@ -143,9 +138,13 @@ function Checkout() {
         },
         theme: { color: "#6b4226" },
         modal: {
+          // Closing the window doesn't prove the payment failed (UPI/bank
+          // flows can complete afterwards), so the order stays pending and the
+          // Razorpay webhook records the real outcome.
           ondismiss: () => {
-            void markFailed({ data: { orderId: order.orderId } });
-            toast("Payment cancelled. Your order was not placed.");
+            toast(
+              "Payment window closed. If you completed the payment, it will be confirmed automatically in My Account → Orders.",
+            );
           },
         },
         handler: async (response: {
@@ -162,14 +161,21 @@ function Checkout() {
                 razorpaySignature: response.razorpay_signature,
               },
             });
-            clear();
             toast.success("Payment received. Thank you!");
-            void navigate({ to: "/account/orders" });
           } catch (error) {
+            // Razorpay reported success, so the money may well have been taken:
+            // still take the customer to their order, where the status is read
+            // from the database and the webhook can confirm it shortly.
             toast.error(
-              error instanceof Error ? error.message : "We couldn't confirm your payment.",
+              error instanceof Error ? error.message : "We couldn't confirm your payment yet.",
             );
           }
+          clear();
+          void navigate({
+            to: "/account/orders/$id",
+            params: { id: order.orderId },
+            search: { placed: true },
+          });
         },
       });
       razorpay.open();
