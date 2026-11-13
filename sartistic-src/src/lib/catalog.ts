@@ -179,6 +179,85 @@ export const galleryImagesQuery = queryOptions({
   },
 });
 
+export type Collection = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  image_url: string | null;
+  is_active: boolean;
+  is_featured: boolean;
+  sort_order: number;
+};
+
+/** Active collections in display order. */
+export const collectionsQuery = queryOptions({
+  queryKey: ["collections"],
+  queryFn: async (): Promise<Collection[]> => {
+    const { data, error } = await supabase
+      .from("collections")
+      .select("id, name, slug, description, image_url, is_active, is_featured, sort_order")
+      .eq("is_active", true)
+      .order("sort_order")
+      .order("name");
+    // Before the admin migration runs the table doesn't exist — fall back quietly.
+    if (error) return [];
+    return data ?? [];
+  },
+});
+
+/** A collection with its (active) products, in the order the admin set. */
+export function collectionQuery(slug: string) {
+  return queryOptions({
+    queryKey: ["collection", slug],
+    queryFn: async (): Promise<(Collection & { products: Product[] }) | null> => {
+      const { data, error } = await supabase
+        .from("collections")
+        .select(
+          `id, name, slug, description, image_url, is_active, is_featured, sort_order, collection_products(sort_order, products(${PRODUCT_SELECT}))`,
+        )
+        .eq("slug", slug)
+        .eq("is_active", true)
+        .maybeSingle();
+      if (error || !data) return null;
+      const rows = (data.collection_products ?? []) as unknown as {
+        sort_order: number;
+        products: Product | null;
+      }[];
+      const { collection_products: _ignored, ...collection } = data;
+      return {
+        ...collection,
+        products: rows
+          .filter((r) => r.products && r.products.is_active)
+          .sort((a, b) => a.sort_order - b.sort_order)
+          .map((r) => r.products as Product),
+      };
+    },
+  });
+}
+
+export type HomepageSection = {
+  key: string;
+  label: string;
+  is_visible: boolean;
+  sort_order: number;
+  content: Record<string, unknown>;
+};
+
+/** Editable homepage content, managed from /admin/homepage. */
+export const homepageSectionsQuery = queryOptions({
+  queryKey: ["homepage-sections"],
+  queryFn: async (): Promise<HomepageSection[] | null> => {
+    const { data, error } = await supabase
+      .from("homepage_sections")
+      .select("key, label, is_visible, sort_order, content")
+      .order("sort_order");
+    // null = table missing/unreachable → homepage falls back to built-in defaults.
+    if (error) return null;
+    return (data ?? []) as HomepageSection[];
+  },
+});
+
 export const siteSettingsQuery = queryOptions({
   queryKey: ["site-settings"],
   queryFn: async () => {

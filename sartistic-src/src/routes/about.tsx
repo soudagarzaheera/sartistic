@@ -32,6 +32,9 @@ function About() {
           <h1 className="mt-4 text-[clamp(2.5rem,6vw,4.5rem)] leading-[1.02]">
             More Than Mehndi. It's an Art Form.
           </h1>
+          <p className="mt-6 text-lg text-muted-foreground">
+            6 years of experience crafting Mehndi for weddings, festivals and everyday celebration.
+          </p>
         </div>
       </section>
 
@@ -58,7 +61,8 @@ function About() {
               time.
             </p>
             <p>
-              SARTISTIC takes that tradition seriously. We focus on the parts we can control well:
+              With 6 years of experience in Mehndi artistry, SARTISTIC takes that tradition
+              seriously. We focus on the parts we can control well:
               finely prepared cones, considered presentation and clear, honest information about
               what is inside each product.
             </p>

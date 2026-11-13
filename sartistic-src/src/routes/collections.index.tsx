@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight } from "lucide-react";
-import { categoriesQuery } from "@/lib/catalog";
+import { categoriesQuery, collectionsQuery } from "@/lib/catalog";
 
 export const Route = createFileRoute("/collections/")({
   head: () => ({
@@ -25,7 +25,17 @@ export const Route = createFileRoute("/collections/")({
 });
 
 function Collections() {
+  const collections = useQuery(collectionsQuery);
   const categories = useQuery(categoriesQuery);
+  // Admin-managed collections; categories are the fallback before any exist.
+  const loading = collections.isLoading || (collections.data?.length === 0 && categories.isLoading);
+  const cards: {
+    id: string;
+    slug: string;
+    name: string;
+    description: string | null;
+    image_url: string | null;
+  }[] = collections.data?.length ? collections.data : (categories.data ?? []);
 
   return (
     <div className="mx-auto max-w-[1400px] px-5 py-16 lg:px-10">
@@ -35,25 +45,38 @@ function Collections() {
       </header>
 
       <div className="mt-14 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {categories.isLoading &&
+        {loading &&
           Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="h-56 animate-pulse bg-secondary" />
           ))}
-        {categories.data?.map((c, i) => (
-          <Link
-            key={c.id}
-            to="/collections/$slug"
-            params={{ slug: c.slug }}
-            className="group flex min-h-56 flex-col justify-between border border-border bg-card p-8 transition-colors hover:border-accent"
-          >
-            <span className="eyebrow">0{i + 1}</span>
-            <div>
-              <p className="font-display text-3xl">{c.name}</p>
-              <p className="mt-2 text-sm text-muted-foreground">{c.description}</p>
-              <ArrowRight className="mt-6 size-4 transition-transform group-hover:translate-x-1" />
-            </div>
-          </Link>
-        ))}
+        {!loading &&
+          cards.map((c, i) => (
+            <Link
+              key={c.id}
+              to="/collections/$slug"
+              params={{ slug: c.slug }}
+              className="group flex min-h-56 flex-col justify-between border border-border bg-card transition-colors hover:border-accent"
+            >
+              {c.image_url && (
+                <div className="aspect-[16/10] overflow-hidden">
+                  <img
+                    src={c.image_url}
+                    alt={c.name}
+                    loading="lazy"
+                    className="size-full object-cover transition-transform duration-700 group-hover:scale-[1.03]"
+                  />
+                </div>
+              )}
+              <div className="flex flex-1 flex-col justify-between gap-6 p-8">
+                <span className="eyebrow">{String(i + 1).padStart(2, "0")}</span>
+                <div>
+                  <p className="font-display text-3xl">{c.name}</p>
+                  <p className="mt-2 text-sm text-muted-foreground">{c.description}</p>
+                  <ArrowRight className="mt-6 size-4 transition-transform group-hover:translate-x-1" />
+                </div>
+              </div>
+            </Link>
+          ))}
       </div>
     </div>
   );
