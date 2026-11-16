@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -43,16 +44,55 @@ function sameLine(a: CartLine, productId: string, variantId: string | null) {
   return a.productId === productId && (a.variantId ?? null) === (variantId ?? null);
 }
 
+/**
+ * Collapses repeated rows for the same product/variant into one line.
+ * Duplicate cart_items rows were created by overlapping saves; each copy holds
+ * the same quantity, so the copies are merged (largest quantity), not summed.
+ */
+function dedupeLines(lines: CartLine[]): CartLine[] {
+  const out: CartLine[] = [];
+  for (const line of lines) {
+    const existing = out.find((m) => sameLine(m, line.productId, line.variantId));
+    if (existing) existing.quantity = Math.max(existing.quantity, line.quantity);
+    else out.push({ ...line });
+  }
+  return out;
+}
+
+/** Replaces the signed-in customer's saved cart with `lines`. */
+async function writeRemoteCart(userId: string, lines: CartLine[]) {
+  const { data: cart } = await supabase
+    .from("carts")
+    .upsert({ user_id: userId }, { onConflict: "user_id" })
+    .select("id")
+    .maybeSingle();
+  if (!cart) return;
+  await supabase.from("cart_items").delete().eq("cart_id", cart.id);
+  if (lines.length) {
+    await supabase.from("cart_items").insert(
+      lines.map((m) => ({
+        cart_id: cart.id,
+        product_id: m.productId,
+        variant_id: m.variantId,
+        quantity: m.quantity,
+      })),
+    );
+  }
+}
+
 export function CartProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [items, setItems] = useState<CartLine[]>([]);
   const [open, setOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  // The user whose saved cart has been loaded and merged; only then is it safe
+  // to write the cart back to Supabase.
+  const [remoteReadyFor, setRemoteReadyFor] = useState<string | null>(null);
 
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setItems(JSON.parse(raw) as CartLine[]);
+      if (raw) setItems(dedupeLines(JSON.parse(raw) as CartLine[]));
     } catch {
       /* ignore malformed local cart */
     }
@@ -72,6 +112,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!hydrated || !user) return;
     let cancelled = false;
+    setRemoteReadyFor(null);
 
     (async () => {
       const { data: cart } = await supabase
@@ -123,28 +164,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
         ];
       });
 
-      setItems((local) => {
-        const merged = [...remoteLines];
-        for (const line of local) {
-          const existing = merged.find((m) => sameLine(m, line.productId, line.variantId));
-          if (existing) existing.quantity = Math.max(existing.quantity, line.quantity);
-          else merged.push(line);
-        }
-        void (async () => {
-          await supabase.from("cart_items").delete().eq("cart_id", cart.id);
-          if (merged.length) {
-            await supabase.from("cart_items").insert(
-              merged.map((m) => ({
-                cart_id: cart.id,
-                product_id: m.productId,
-                variant_id: m.variantId,
-                quantity: m.quantity,
-              })),
-            );
-          }
-        })();
-        return merged;
-      });
+      if (cancelled) return;
+      // Pure merge (no side effects): the saved cart, then any lines from this
+      // browser. The same line in both keeps the larger quantity, never the sum,
+      // so the cart isn't doubled when localStorage already mirrors Supabase.
+      setItems((local) => dedupeLines([...remoteLines, ...local]));
+      // The save effect below then writes the merged, de-duplicated cart once.
+      setRemoteReadyFor(user.id);
     })();
 
     return () => {
@@ -153,40 +179,50 @@ export function CartProvider({ children }: { children: ReactNode }) {
     // Runs once per signed-in user session.
   }, [user?.id, hydrated]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const syncRemote = useCallback(
-    async (next: CartLine[]) => {
-      if (!user) return;
-      const { data: cart } = await supabase
-        .from("carts")
-        .upsert({ user_id: user.id }, { onConflict: "user_id" })
-        .select("id")
-        .maybeSingle();
-      if (!cart) return;
-      await supabase.from("cart_items").delete().eq("cart_id", cart.id);
-      if (next.length) {
-        await supabase.from("cart_items").insert(
-          next.map((m) => ({
-            cart_id: cart.id,
-            product_id: m.productId,
-            variant_id: m.variantId,
-            quantity: m.quantity,
-          })),
-        );
-      }
-    },
-    [user],
-  );
+  // On sign-out, start an empty guest cart; the customer's cart stays saved
+  // in Supabase and is restored at their next sign-in.
+  const previousUserId = useRef<string | null>(null);
+  useEffect(() => {
+    const id = user?.id ?? null;
+    if (previousUserId.current && previousUserId.current !== id) {
+      setRemoteReadyFor(null);
+      setItems([]);
+    }
+    previousUserId.current = id;
+  }, [user?.id]);
 
-  const update = useCallback(
-    (updater: (prev: CartLine[]) => CartLine[]) => {
-      setItems((prev) => {
-        const next = updater(prev);
-        void syncRemote(next);
-        return next;
-      });
-    },
-    [syncRemote],
+  // Saves to Supabase run one at a time and always write the latest cart, so
+  // a delete+insert can never interleave with another (which duplicated rows).
+  const saveQueue = useRef<{ running: boolean; next: { userId: string; lines: CartLine[] } | null }>(
+    { running: false, next: null },
   );
+  const scheduleRemoteSave = useCallback((userId: string, lines: CartLine[]) => {
+    const queue = saveQueue.current;
+    queue.next = { userId, lines };
+    if (queue.running) return;
+    queue.running = true;
+    void (async () => {
+      try {
+        while (queue.next) {
+          const job = queue.next;
+          queue.next = null;
+          await writeRemoteCart(job.userId, job.lines);
+        }
+      } finally {
+        queue.running = false;
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!user || remoteReadyFor !== user.id) return;
+    scheduleRemoteSave(user.id, items);
+  }, [items, user, remoteReadyFor, scheduleRemoteSave]);
+
+  // State updaters stay pure: React may call them more than once.
+  const update = useCallback((updater: (prev: CartLine[]) => CartLine[]) => {
+    setItems(updater);
+  }, []);
 
   const value = useMemo<CartContextValue>(() => {
     const subtotal = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
