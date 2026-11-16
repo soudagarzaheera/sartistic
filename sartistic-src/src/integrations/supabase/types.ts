@@ -410,9 +410,25 @@ export type Database = {
           discount: number
           id: string
           order_number: string
+          checkout_key: string | null
+          payment_collected_at: string | null
+          payment_collected_by: string | null
+          payment_method: string
           payment_status: string
           razorpay_order_id: string | null
           razorpay_payment_id: string | null
+          shipment_created_at: string | null
+          shipment_requested_at: string | null
+          shiprocket_awb: string | null
+          shiprocket_order_id: string | null
+          shiprocket_shipment_id: string | null
+          shiprocket_courier: string | null
+          shiprocket_etd: string | null
+          shiprocket_status: string | null
+          shiprocket_status_code: number | null
+          shiprocket_track_url: string | null
+          shiprocket_tracking: Json | null
+          tracking_synced_at: string | null
           shipping_address: string
           shipping_city: string
           shipping_country: string
@@ -435,9 +451,25 @@ export type Database = {
           discount?: number
           id?: string
           order_number: string
+          checkout_key?: string | null
+          payment_collected_at?: string | null
+          payment_collected_by?: string | null
+          payment_method?: string
           payment_status?: string
           razorpay_order_id?: string | null
           razorpay_payment_id?: string | null
+          shipment_created_at?: string | null
+          shipment_requested_at?: string | null
+          shiprocket_awb?: string | null
+          shiprocket_order_id?: string | null
+          shiprocket_shipment_id?: string | null
+          shiprocket_courier?: string | null
+          shiprocket_etd?: string | null
+          shiprocket_status?: string | null
+          shiprocket_status_code?: number | null
+          shiprocket_track_url?: string | null
+          shiprocket_tracking?: Json | null
+          tracking_synced_at?: string | null
           shipping_address: string
           shipping_city: string
           shipping_country?: string
@@ -460,9 +492,25 @@ export type Database = {
           discount?: number
           id?: string
           order_number?: string
+          checkout_key?: string | null
+          payment_collected_at?: string | null
+          payment_collected_by?: string | null
+          payment_method?: string
           payment_status?: string
           razorpay_order_id?: string | null
           razorpay_payment_id?: string | null
+          shipment_created_at?: string | null
+          shipment_requested_at?: string | null
+          shiprocket_awb?: string | null
+          shiprocket_order_id?: string | null
+          shiprocket_shipment_id?: string | null
+          shiprocket_courier?: string | null
+          shiprocket_etd?: string | null
+          shiprocket_status?: string | null
+          shiprocket_status_code?: number | null
+          shiprocket_track_url?: string | null
+          shiprocket_tracking?: Json | null
+          tracking_synced_at?: string | null
           shipping_address?: string
           shipping_city?: string
           shipping_country?: string

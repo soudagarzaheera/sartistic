@@ -101,7 +101,7 @@ INSERT INTO public.homepage_sections (key, label, sort_order, is_visible, conten
     'eyebrow', 'Premium Mehndi · Est. Artistry',
     'heading', E'Tradition,\nCrafted Beautifully.',
     'subtitle', 'Discover SARTISTIC Mehndi — thoughtfully presented for moments of beauty, celebration and artistic expression.',
-    'image_url', '/images/image1.jpg',
+    'image_url', '/images/image1.jpeg'
     'image_alt', 'Hands adorned with intricate Mehndi patterns resting on ivory silk',
     'primary_label', 'Shop Mehndi', 'primary_link', '/shop',
     'secondary_label', 'Explore Our Story', 'secondary_link', '/about')),

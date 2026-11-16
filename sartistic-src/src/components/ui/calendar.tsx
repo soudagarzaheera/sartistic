@@ -40,7 +40,7 @@ function Calendar({
         months: cn("relative flex flex-col gap-4 md:flex-row", defaultClassNames.months),
         month: cn("flex w-full flex-col gap-4", defaultClassNames.month),
         nav: cn(
-          "absolute inset-x-0 top-0 flex w-full items-center justify-between gap-1",
+          "absolute inset-x-0 top-0 flex w-full items-center justify-between gap-1 bg-[#2E1915]/50",
           defaultClassNames.nav,
         ),
         button_previous: cn(

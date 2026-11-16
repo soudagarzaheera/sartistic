@@ -102,6 +102,9 @@ export function ProductCard({
             )}
           </div>
         </div>
+        <p className="mt-1 text-xs tracking-[0.12em] text-muted-foreground ">
+          Each cone · 35 g
+        </p>
         {product.short_description && (
           <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
             {product.short_description}

@@ -1,6 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import type { Database } from "@/integrations/supabase/types";
 
 const lineSchema = z.object({
   productId: z.string().uuid(),
@@ -25,7 +27,7 @@ const createOrderSchema = z.object({
   couponCode: z.string().trim().max(40).nullable().optional(),
 });
 
-const SHIPPING_FEE = 79;
+const SHIPPING_FEE = 40
 const FREE_SHIPPING_ABOVE = 999;
 
 /**
@@ -49,9 +51,124 @@ function orderNumber() {
   return `SAR-${stamp}-${rand}`;
 }
 
+type CreateOrderInput = z.infer<typeof createOrderSchema>;
+type DbClient = SupabaseClient<Database>;
+
+type OrderItemRow = {
+  product_id: string;
+  variant_id: string | null;
+  product_name: string;
+  variant_name: string | null;
+  sku: string | null;
+  image_url: string | null;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+};
+
 /**
- * Creates the order server-side. Prices, discounts and totals are always
- * recomputed from the database — browser-supplied amounts are never trusted.
+ * Prices an order from the database: active products/variants, stock, coupon
+ * and shipping. Shared by prepaid and COD checkout so both always use
+ * identical server-side amounts; browser-supplied prices are never trusted.
+ */
+async function priceOrder(supabase: DbClient, data: CreateOrderInput) {
+  const productIds = [...new Set(data.items.map((i) => i.productId))];
+  const { data: products, error: productError } = await supabase
+    .from("products")
+    .select(
+      "id, name, price, sku, stock_quantity, is_active, product_images(image_url, is_primary, sort_order), product_variants(id, name, price, stock_quantity, is_active, sku)",
+    )
+    .in("id", productIds);
+  if (productError) throw new Error("We couldn't load your items. Please try again.");
+
+  let subtotal = 0;
+  const orderItems: OrderItemRow[] = [];
+
+  for (const line of data.items) {
+    const product = products?.find((p) => p.id === line.productId);
+    if (!product || !product.is_active) {
+      throw new Error("One of the items is no longer available.");
+    }
+    const variant = line.variantId
+      ? product.product_variants?.find((v) => v.id === line.variantId && v.is_active)
+      : null;
+    if (line.variantId && !variant) {
+      throw new Error(`The selected option for ${product.name} is unavailable.`);
+    }
+    const stock = variant?.stock_quantity ?? product.stock_quantity;
+    if (stock < line.quantity) {
+      throw new Error(`${product.name} only has ${stock} left in stock.`);
+    }
+    const unitPrice = Number(variant?.price ?? product.price);
+    const total = unitPrice * line.quantity;
+    subtotal += total;
+    const image =
+      [...(product.product_images ?? [])].sort(
+        (a, b) => Number(b.is_primary) - Number(a.is_primary) || a.sort_order - b.sort_order,
+      )[0]?.image_url ?? null;
+
+    orderItems.push({
+      product_id: product.id,
+      variant_id: variant?.id ?? null,
+      product_name: product.name,
+      variant_name: variant?.name ?? null,
+      sku: variant?.sku ?? product.sku,
+      image_url: image,
+      quantity: line.quantity,
+      unit_price: unitPrice,
+      total_price: total,
+    });
+  }
+
+  // Coupon validation happens server-side against the coupons table.
+  let discount = 0;
+  let appliedCoupon: string | null = null;
+  if (data.couponCode) {
+    const { data: coupon } = await supabase
+      .from("coupons")
+      .select("*")
+      .eq("code", data.couponCode.toUpperCase())
+      .eq("is_active", true)
+      .maybeSingle();
+    const now = Date.now();
+    const valid =
+      coupon &&
+      subtotal >= Number(coupon.minimum_order_value) &&
+      (!coupon.starts_at || new Date(coupon.starts_at).getTime() <= now) &&
+      (!coupon.expires_at || new Date(coupon.expires_at).getTime() >= now) &&
+      (!coupon.usage_limit || coupon.used_count < coupon.usage_limit);
+    if (!valid) throw new Error("That coupon code isn't valid for this order.");
+    discount =
+      coupon!.discount_type === "percentage"
+        ? (subtotal * Number(coupon!.discount_value)) / 100
+        : Number(coupon!.discount_value);
+    if (coupon!.maximum_discount) discount = Math.min(discount, Number(coupon!.maximum_discount));
+    discount = Math.min(Math.round(discount), subtotal);
+    appliedCoupon = coupon!.code;
+  }
+
+  const shippingFee = subtotal - discount >= FREE_SHIPPING_ABOVE ? 0 : SHIPPING_FEE;
+  const total = subtotal - discount + shippingFee;
+
+  return { orderItems, subtotal, discount, shippingFee, total, appliedCoupon };
+}
+
+function shippingColumns(shipping: CreateOrderInput["shipping"]) {
+  return {
+    shipping_name: shipping.full_name,
+    shipping_phone: shipping.phone,
+    shipping_email: shipping.email,
+    shipping_address: shipping.address,
+    shipping_city: shipping.city,
+    shipping_state: shipping.state,
+    shipping_postal_code: shipping.postal_code,
+    shipping_country: shipping.country || "India",
+  };
+}
+
+/**
+ * Creates a prepaid (Razorpay) order server-side. Prices, discounts and
+ * totals are always recomputed from the database.
  */
 export const createCheckoutOrder = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -59,93 +176,8 @@ export const createCheckoutOrder = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
 
-    const productIds = [...new Set(data.items.map((i) => i.productId))];
-    const { data: products, error: productError } = await supabase
-      .from("products")
-      .select(
-        "id, name, price, sku, stock_quantity, is_active, product_images(image_url, is_primary, sort_order), product_variants(id, name, price, stock_quantity, is_active, sku)",
-      )
-      .in("id", productIds);
-    if (productError) throw new Error("We couldn't load your items. Please try again.");
-
-    let subtotal = 0;
-    const orderItems: {
-      product_id: string;
-      variant_id: string | null;
-      product_name: string;
-      variant_name: string | null;
-      sku: string | null;
-      image_url: string | null;
-      quantity: number;
-      unit_price: number;
-      total_price: number;
-    }[] = [];
-
-    for (const line of data.items) {
-      const product = products?.find((p) => p.id === line.productId);
-      if (!product || !product.is_active) {
-        throw new Error("One of the items is no longer available.");
-      }
-      const variant = line.variantId
-        ? product.product_variants?.find((v) => v.id === line.variantId && v.is_active)
-        : null;
-      if (line.variantId && !variant) {
-        throw new Error(`The selected option for ${product.name} is unavailable.`);
-      }
-      const stock = variant?.stock_quantity ?? product.stock_quantity;
-      if (stock < line.quantity) {
-        throw new Error(`${product.name} only has ${stock} left in stock.`);
-      }
-      const unitPrice = Number(variant?.price ?? product.price);
-      const total = unitPrice * line.quantity;
-      subtotal += total;
-      const image =
-        [...(product.product_images ?? [])].sort(
-          (a, b) => Number(b.is_primary) - Number(a.is_primary) || a.sort_order - b.sort_order,
-        )[0]?.image_url ?? null;
-
-      orderItems.push({
-        product_id: product.id,
-        variant_id: variant?.id ?? null,
-        product_name: product.name,
-        variant_name: variant?.name ?? null,
-        sku: variant?.sku ?? product.sku,
-        image_url: image,
-        quantity: line.quantity,
-        unit_price: unitPrice,
-        total_price: total,
-      });
-    }
-
-    // Coupon validation happens server-side against the coupons table.
-    let discount = 0;
-    let appliedCoupon: string | null = null;
-    if (data.couponCode) {
-      const { data: coupon } = await supabase
-        .from("coupons")
-        .select("*")
-        .eq("code", data.couponCode.toUpperCase())
-        .eq("is_active", true)
-        .maybeSingle();
-      const now = Date.now();
-      const valid =
-        coupon &&
-        subtotal >= Number(coupon.minimum_order_value) &&
-        (!coupon.starts_at || new Date(coupon.starts_at).getTime() <= now) &&
-        (!coupon.expires_at || new Date(coupon.expires_at).getTime() >= now) &&
-        (!coupon.usage_limit || coupon.used_count < coupon.usage_limit);
-      if (!valid) throw new Error("That coupon code isn't valid for this order.");
-      discount =
-        coupon!.discount_type === "percentage"
-          ? (subtotal * Number(coupon!.discount_value)) / 100
-          : Number(coupon!.discount_value);
-      if (coupon!.maximum_discount) discount = Math.min(discount, Number(coupon!.maximum_discount));
-      discount = Math.min(Math.round(discount), subtotal);
-      appliedCoupon = coupon!.code;
-    }
-
-    const shippingFee = subtotal - discount >= FREE_SHIPPING_ABOVE ? 0 : SHIPPING_FEE;
-    const total = subtotal - discount + shippingFee;
+    const { orderItems, subtotal, discount, shippingFee, total, appliedCoupon } =
+      await priceOrder(supabase, data);
 
     const { data: order, error: orderError } = await supabase
       .from("orders")
@@ -159,14 +191,7 @@ export const createCheckoutOrder = createServerFn({ method: "POST" })
         status: "pending",
         payment_status: "pending",
         coupon_code: appliedCoupon,
-        shipping_name: data.shipping.full_name,
-        shipping_phone: data.shipping.phone,
-        shipping_email: data.shipping.email,
-        shipping_address: data.shipping.address,
-        shipping_city: data.shipping.city,
-        shipping_state: data.shipping.state,
-        shipping_postal_code: data.shipping.postal_code,
-        shipping_country: data.shipping.country || "India",
+        ...shippingColumns(data.shipping),
       })
       .select("id, order_number, total")
       .single();
@@ -333,6 +358,111 @@ export const verifyCheckoutPayment = createServerFn({ method: "POST" })
     }
 
     return { ok: true, orderNumber: order.order_number };
+  });
+
+// ---------------------------------------------------------------------------
+// Cash on Delivery
+// ---------------------------------------------------------------------------
+
+const createCodOrderSchema = createOrderSchema.extend({
+  /** Generated once per checkout attempt in the browser; makes retries safe. */
+  checkoutKey: z.string().uuid(),
+});
+
+type CodOrderResult = { orderId: string; orderNumber: string; total: number };
+
+/**
+ * Creates a Cash on Delivery order. Razorpay is never contacted.
+ *
+ * Idempotent per (customer, checkoutKey): a double click, a retried request or
+ * a network replay returns the order that was already created instead of
+ * creating a second one. The order is written with the service role (customers
+ * can't insert COD orders directly), always for the authenticated user.
+ */
+export const createCodOrder = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: unknown) => createCodOrderSchema.parse(data))
+  .handler(async ({ data, context }): Promise<CodOrderResult> => {
+    const { supabase, userId } = context;
+    const supabaseAdmin = await getSupabaseAdmin();
+
+    async function existingOrder(): Promise<CodOrderResult | null> {
+      const { data: found, error } = await supabaseAdmin
+        .from("orders")
+        .select("id, order_number, total, status")
+        .eq("user_id", userId)
+        .eq("checkout_key", data.checkoutKey)
+        .maybeSingle();
+      if (error) throw new Error("We couldn't place your order. Please try again.");
+      // A row still "pending" is an attempt that failed half-way and is being
+      // cleaned up — not a placed order.
+      if (!found || found.status === "pending") return null;
+      return { orderId: found.id, orderNumber: found.order_number, total: Number(found.total) };
+    }
+
+    const already = await existingOrder();
+    if (already) return already;
+
+    const { orderItems, subtotal, discount, shippingFee, total, appliedCoupon } =
+      await priceOrder(supabase, data);
+
+    // Inserted as pending first, items added, then confirmed: an order only
+    // becomes visible as a real (confirmed) COD order once it is complete.
+    const { data: order, error: orderError } = await supabaseAdmin
+      .from("orders")
+      .insert({
+        user_id: userId,
+        order_number: orderNumber(),
+        checkout_key: data.checkoutKey,
+        payment_method: "cod",
+        subtotal,
+        discount,
+        shipping_fee: shippingFee,
+        total,
+        status: "pending",
+        payment_status: "pending",
+        coupon_code: appliedCoupon,
+        ...shippingColumns(data.shipping),
+      })
+      .select("id, order_number, total")
+      .single();
+
+    if (orderError || !order) {
+      if (orderError?.code === "23505") {
+        // Unique violation: a concurrent request with the same key won.
+        const winner = await existingOrder();
+        if (winner) return winner;
+        throw new Error("Your order is still being placed. Please check My Account → Orders.");
+      }
+      console.error(`[checkout] COD order insert failed: ${orderError?.message ?? "no row"}`);
+      throw new Error("We couldn't place your order. Please try again.");
+    }
+
+    const { error: itemsError } = await supabaseAdmin
+      .from("order_items")
+      .insert(orderItems.map((item) => ({ ...item, order_id: order.id })));
+    if (itemsError) {
+      console.error(`[checkout] COD order items failed for ${order.id}: ${itemsError.message}`);
+      await supabaseAdmin.from("orders").delete().eq("id", order.id).eq("status", "pending");
+      throw new Error("We couldn't place your order. Please try again.");
+    }
+
+    const { data: confirmed, error: confirmError } = await supabaseAdmin
+      .from("orders")
+      .update({ status: "confirmed" })
+      .eq("id", order.id)
+      .eq("user_id", userId)
+      .eq("status", "pending")
+      .select("id");
+    if (confirmError || !confirmed || confirmed.length !== 1) {
+      console.error(
+        `[checkout] COD order ${order.id} could not be confirmed: ${confirmError?.message ?? "0 rows"}`,
+      );
+      await supabaseAdmin.from("orders").delete().eq("id", order.id).eq("status", "pending");
+      throw new Error("We couldn't place your order. Please try again.");
+    }
+
+    return { orderId: order.id, orderNumber: order.order_number, total: Number(order.total) };
   });
 
 // Note: there is intentionally no "mark failed on dismiss" function. Closing

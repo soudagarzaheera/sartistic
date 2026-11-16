@@ -216,6 +216,10 @@ function ProductPage() {
             )}
           </div>
 
+          <p className="mt-3 text-sm tracking-[0.12em] text-muted-foreground">
+            Each cone weighs 35 g
+          </p>
+
           {product.short_description && (
             <p className="mt-5 text-muted-foreground leading-relaxed">
               {product.short_description}

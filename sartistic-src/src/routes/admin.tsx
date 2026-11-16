@@ -4,8 +4,6 @@ import { useEffect, useState } from "react";
 import {
   BarChart3,
   FolderTree,
-  Home,
-  ImageIcon,
   Images,
   Layers,
   LogOut,
@@ -42,8 +40,6 @@ const NAV = [
   { to: "/admin/categories", label: "Categories", icon: FolderTree },
   { to: "/admin/orders", label: "Orders", icon: ShoppingBag },
   { to: "/admin/customers", label: "Customers", icon: Users },
-  { to: "/admin/homepage", label: "Homepage", icon: Home },
-  { to: "/admin/images", label: "Image Library", icon: ImageIcon },
   { to: "/admin/gallery", label: "Design Gallery", icon: Images },
   { to: "/admin/reviews", label: "Reviews", icon: MessageSquare },
   { to: "/admin/settings", label: "Settings", icon: Settings },

@@ -29,7 +29,7 @@ function AdminSettings() {
         <AdminTeam />
         <div className="space-y-6">
           <ChangePassword />
-          <WhySartistic />
+          {/* <WhySartistic /> */}
         </div>
       </div>
     </div>
@@ -175,95 +175,95 @@ function ChangePassword() {
 
 type WhyItem = { number: string; title: string; description: string };
 
-function WhySartistic() {
-  const queryClient = useQueryClient();
-  const [items, setItems] = useState<WhyItem[]>([]);
-  const [busy, setBusy] = useState(false);
-  const setting = useQuery({
-    queryKey: ["admin", "settings", "why"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("site_settings")
-        .select("value")
-        .eq("key", "why_sartistic")
-        .maybeSingle();
-      if (error) throw error;
-      return (Array.isArray(data?.value) ? data.value : []) as WhyItem[];
-    },
-  });
-  useEffect(() => {
-    if (setting.data) setItems(setting.data);
-  }, [setting.data]);
+// function WhySartistic() {
+//   const queryClient = useQueryClient();
+//   const [items, setItems] = useState<WhyItem[]>([]);
+//   const [busy, setBusy] = useState(false);
+//   const setting = useQuery({
+//     queryKey: ["admin", "settings", "why"],
+//     queryFn: async () => {
+//       const { data, error } = await supabase
+//         .from("site_settings")
+//         .select("value")
+//         .eq("key", "why_sartistic")
+//         .maybeSingle();
+//       if (error) throw error;
+//       return (Array.isArray(data?.value) ? data.value : []) as WhyItem[];
+//     },
+//   });
+//   useEffect(() => {
+//     if (setting.data) setItems(setting.data);
+//   }, [setting.data]);
 
-  async function save() {
-    const cleaned = items
-      .filter((i) => i.title.trim())
-      .map((i, n) => ({
-        number: String(n + 1).padStart(2, "0"),
-        title: i.title.trim(),
-        description: i.description.trim(),
-      }));
-    setBusy(true);
-    const { error } = await supabase
-      .from("site_settings")
-      .upsert({ key: "why_sartistic", value: cleaned as unknown as Json }, { onConflict: "key" });
-    setBusy(false);
-    if (error) return void toast.error("Couldn't save");
-    toast.success("Saved — live on the homepage");
-    void queryClient.invalidateQueries({ queryKey: ["admin", "settings", "why"] });
-    invalidateStorefront(queryClient);
-  }
+//   async function save() {
+//     const cleaned = items
+//       .filter((i) => i.title.trim())
+//       .map((i, n) => ({
+//         number: String(n + 1).padStart(2, "0"),
+//         title: i.title.trim(),
+//         description: i.description.trim(),
+//       }));
+//     setBusy(true);
+//     const { error } = await supabase
+//       .from("site_settings")
+//       .upsert({ key: "why_sartistic", value: cleaned as unknown as Json }, { onConflict: "key" });
+//     setBusy(false);
+//     if (error) return void toast.error("Couldn't save");
+//     toast.success("Saved — live on the homepage");
+//     void queryClient.invalidateQueries({ queryKey: ["admin", "settings", "why"] });
+//     invalidateStorefront(queryClient);
+//   }
 
-  return (
-    <Panel
-      title="“Why SARTISTIC” points (homepage)"
-      actions={
-        <Button
-          variant="outline"
-          size="sm"
-          className="rounded-none"
-          onClick={() => setItems((p) => [...p, { number: "", title: "", description: "" }])}
-        >
-          <Plus className="mr-1 size-3.5" /> Add
-        </Button>
-      }
-    >
-      <div className="space-y-4">
-        {items.map((item, i) => (
-          <div key={i} className="space-y-2 border-b border-border pb-4 last:border-0">
-            <div className="flex gap-2">
-              <Input
-                placeholder="Title"
-                value={item.title}
-                onChange={(e) =>
-                  setItems((p) => p.map((x, j) => (j === i ? { ...x, title: e.target.value } : x)))
-                }
-              />
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label="Remove point"
-                onClick={() => setItems((p) => p.filter((_, j) => j !== i))}
-              >
-                <Trash2 className="size-4" />
-              </Button>
-            </div>
-            <Textarea
-              rows={2}
-              placeholder="Description"
-              value={item.description}
-              onChange={(e) =>
-                setItems((p) =>
-                  p.map((x, j) => (j === i ? { ...x, description: e.target.value } : x)),
-                )
-              }
-            />
-          </div>
-        ))}
-        <Button disabled={busy} className="rounded-none" onClick={() => void save()}>
-          {busy ? "Saving…" : "Save points"}
-        </Button>
-      </div>
-    </Panel>
-  );
-}
+//   return (
+//     <Panel
+//       title="“Why SARTISTIC” points (homepage)"
+//       actions={
+//         <Button
+//           variant="outline"
+//           size="sm"
+//           className="rounded-none"
+//           onClick={() => setItems((p) => [...p, { number: "", title: "", description: "" }])}
+//         >
+//           <Plus className="mr-1 size-3.5" /> Add
+//         </Button>
+//       }
+//     >
+//       <div className="space-y-4">
+//         {items.map((item, i) => (
+//           <div key={i} className="space-y-2 border-b border-border pb-4 last:border-0">
+//             <div className="flex gap-2">
+//               <Input
+//                 placeholder="Title"
+//                 value={item.title}
+//                 onChange={(e) =>
+//                   setItems((p) => p.map((x, j) => (j === i ? { ...x, title: e.target.value } : x)))
+//                 }
+//               />
+//               <Button
+//                 variant="ghost"
+//                 size="icon"
+//                 aria-label="Remove point"
+//                 onClick={() => setItems((p) => p.filter((_, j) => j !== i))}
+//               >
+//                 <Trash2 className="size-4" />
+//               </Button>
+//             </div>
+//             <Textarea
+//               rows={2}
+//               placeholder="Description"
+//               value={item.description}
+//               onChange={(e) =>
+//                 setItems((p) =>
+//                   p.map((x, j) => (j === i ? { ...x, description: e.target.value } : x)),
+//                 )
+//               }
+//             />
+//           </div>
+//         ))}
+//         <Button disabled={busy} className="rounded-none" onClick={() => void save()}>
+//           {busy ? "Saving…" : "Save points"}
+//         </Button>
+//       </div>
+//     </Panel>
+//   );
+// }

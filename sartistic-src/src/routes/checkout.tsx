@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,12 @@ import { Label } from "@/components/ui/label";
 import { formatPrice } from "@/lib/format";
 import { useCart } from "@/hooks/useCart";
 import { useAuth } from "@/hooks/useAuth";
-import { createCheckoutOrder, verifyCheckoutPayment } from "@/lib/checkout.functions";
+import {
+  createCheckoutOrder,
+  createCodOrder,
+  verifyCheckoutPayment,
+} from "@/lib/checkout.functions";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/checkout")({
   head: () => ({
@@ -54,21 +59,51 @@ function loadRazorpay() {
   });
 }
 
+type PaymentMethod = "razorpay" | "cod";
+
+/**
+ * Random v4 UUID. crypto.randomUUID() only exists on HTTPS/localhost, so on
+ * plain-http origins (e.g. testing via a LAN IP) fall back to getRandomValues,
+ * which is available everywhere.
+ */
+function newCheckoutKey(): string {
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6]! & 0x0f) | 0x40;
+  b[8] = (b[8]! & 0x3f) | 0x80;
+  const h = [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
 function Checkout() {
   const navigate = useNavigate();
   const { items, subtotal, clear } = useCart();
   const { user, loading } = useAuth();
   const createOrder = useServerFn(createCheckoutOrder);
   const verifyPayment = useServerFn(verifyCheckoutPayment);
+  const placeCodOrder = useServerFn(createCodOrder);
 
   const [coupon, setCoupon] = useState("");
   const [busy, setBusy] = useState(false);
+  const [method, setMethod] = useState<PaymentMethod>("razorpay");
+
+  // One key per checkout attempt: resending the same COD request (double
+  // click, retry after a timeout) returns the same order instead of a new one.
+  // A different cart or coupon is a different order, so it gets a new key.
+  const cartSignature = useMemo(
+    () => JSON.stringify([items.map((i) => [i.productId, i.variantId, i.quantity]), coupon.trim()]),
+    [items, coupon],
+  );
+  const [checkoutKey, setCheckoutKey] = useState(newCheckoutKey);
+  useEffect(() => {
+    setCheckoutKey(newCheckoutKey());
+  }, [cartSignature]);
 
   useEffect(() => {
     if (!loading && !user) void navigate({ to: "/auth" });
   }, [user, loading, navigate]);
 
-  const shipping = subtotal >= 999 || subtotal === 0 ? 0 : 79;
+  const shipping = subtotal >= 999 || subtotal === 0 ? 0 :40;
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -82,32 +117,48 @@ function Checkout() {
       return;
     }
 
+    if (busy) return;
     setBusy(true);
     try {
       const fullAddress = [parsed.data.address, parsed.data.address_line_2]
         .filter(Boolean)
         .join(", ");
 
-      const order = await createOrder({
-        data: {
-          items: items.map((i) => ({
-            productId: i.productId,
-            variantId: i.variantId,
-            quantity: i.quantity,
-          })),
-          shipping: {
-            full_name: parsed.data.full_name,
-            email: parsed.data.email,
-            phone: parsed.data.phone,
-            address: fullAddress,
-            city: parsed.data.city,
-            state: parsed.data.state,
-            postal_code: parsed.data.postal_code,
-            country: "India",
-          },
-          couponCode: coupon.trim() ? coupon.trim() : null,
+      const orderInput = {
+        items: items.map((i) => ({
+          productId: i.productId,
+          variantId: i.variantId,
+          quantity: i.quantity,
+        })),
+        shipping: {
+          full_name: parsed.data.full_name,
+          email: parsed.data.email,
+          phone: parsed.data.phone,
+          address: fullAddress,
+          city: parsed.data.city,
+          state: parsed.data.state,
+          postal_code: parsed.data.postal_code,
+          country: "India",
         },
-      });
+        couponCode: coupon.trim() ? coupon.trim() : null,
+      };
+
+      if (method === "cod") {
+        // Cash on Delivery: no Razorpay at all — the server creates and
+        // confirms the order, and payment is collected by the courier.
+        const codOrder = await placeCodOrder({ data: { ...orderInput, checkoutKey } });
+        toast.success(`Order ${codOrder.orderNumber} placed`);
+        clear();
+        void navigate({
+          to: "/account/orders/$id",
+          params: { id: codOrder.orderId },
+          search: { placed: true },
+          replace: true,
+        });
+        return;
+      }
+
+      const order = await createOrder({ data: orderInput });
 
       if (order.paymentUnavailable || !order.razorpay) {
         toast.error(
@@ -257,9 +308,41 @@ function Checkout() {
             Coupon discounts are applied and verified securely when your order is created.
           </p>
 
+          <fieldset className="mt-6 border-t border-border pt-5">
+            <legend className="eyebrow float-left w-full">Payment method</legend>
+            <div role="radiogroup" className="clear-both space-y-2 pt-3">
+              <PaymentOption
+                value="razorpay"
+                selected={method}
+                onSelect={setMethod}
+                title="Pay Online"
+                body="UPI, cards, net banking and wallets via Razorpay."
+              />
+              <PaymentOption
+                value="cod"
+                selected={method}
+                onSelect={setMethod}
+                title="Cash on Delivery"
+                body="Pay in cash or UPI to the courier when your order is delivered."
+              />
+            </div>
+          </fieldset>
+
           <Button type="submit" disabled={busy} className="mt-6 h-12 w-full rounded-none">
-            {busy ? "Preparing payment…" : "Pay Securely"}
+            {method === "cod"
+              ? busy
+                ? "Placing order…"
+                : "Place Order"
+              : busy
+                ? "Preparing payment…"
+                : "Pay Securely"}
           </Button>
+          {method === "cod" && (
+            <p className="mt-3 text-xs text-muted-foreground">
+              Nothing is charged now. The final amount shown on your order confirmation is payable
+              at the time of delivery.
+            </p>
+          )}
         </aside>
       </form>
     </div>
@@ -291,6 +374,43 @@ function Field({
         className="rounded-none"
       />
     </div>
+  );
+}
+
+function PaymentOption({
+  value,
+  selected,
+  onSelect,
+  title,
+  body,
+}: {
+  value: PaymentMethod;
+  selected: PaymentMethod;
+  onSelect: (value: PaymentMethod) => void;
+  title: string;
+  body: string;
+}) {
+  const active = value === selected;
+  return (
+    <label
+      className={cn(
+        "flex cursor-pointer gap-3 border p-4 transition-colors",
+        active ? "border-foreground bg-background" : "border-border hover:border-foreground/40",
+      )}
+    >
+      <input
+        type="radio"
+        name="payment_method"
+        value={value}
+        checked={active}
+        onChange={() => onSelect(value)}
+        className="mt-1 size-4 accent-accent"
+      />
+      <span>
+        <span className="block text-sm font-medium">{title}</span>
+        <span className="mt-0.5 block text-xs text-muted-foreground">{body}</span>
+      </span>
+    </label>
   );
 }
 

@@ -1,10 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { formatDate, formatPrice, ORDER_STATUSES, titleCase } from "@/lib/format";
+import { formatDate, formatPrice, titleCase } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { OrderTracker, useTrackingRefresh } from "@/components/site/OrderTracker";
 
 // Poll for up to 3 minutes after checkout while the payment is confirmed
 // (by the verification call or, as a fallback, the Razorpay webhook).
@@ -35,7 +36,11 @@ function OrderDetail() {
     queryKey: ["order", id],
     enabled: Boolean(user),
     refetchInterval: (query) =>
-      checking && query.state.data?.payment_status === "pending" ? CONFIRM_POLL_MS : false,
+      checking &&
+      query.state.data?.payment_method !== "cod" &&
+      query.state.data?.payment_status === "pending"
+        ? CONFIRM_POLL_MS
+        : false,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("orders")
@@ -46,6 +51,11 @@ function OrderDetail() {
       return data;
     },
   });
+
+  // Pull fresh Shiprocket tracking at most once per view, only when stale.
+  const refetch = order.refetch;
+  const onTrackingUpdated = useCallback(() => void refetch(), [refetch]);
+  useTrackingRefresh(order.data, onTrackingUpdated);
 
   if (order.isLoading) {
     return <p className="text-sm text-muted-foreground">Loading order…</p>;
@@ -62,10 +72,7 @@ function OrderDetail() {
   }
 
   const data = order.data;
-  const timeline = ORDER_STATUSES.filter(
-    (s) => !["cancelled", "refunded"].includes(s),
-  ) as readonly string[];
-  const currentIndex = timeline.indexOf(data.status);
+  const isCod = data.payment_method === "cod";
 
   return (
     <section>
@@ -75,31 +82,24 @@ function OrderDetail() {
       <h2 className="mt-4 font-display text-3xl">{data.order_number}</h2>
       <p className="text-sm text-muted-foreground">Placed {formatDate(data.created_at)}</p>
 
-      <PaymentBanner
-        placed={Boolean(placed)}
-        paymentStatus={data.payment_status}
-        stillChecking={checking}
-      />
+      {isCod ? (
+        <CodBanner
+          placed={Boolean(placed)}
+          paymentStatus={data.payment_status}
+          status={data.status}
+          total={data.total}
+        />
+      ) : (
+        <PaymentBanner
+          placed={Boolean(placed)}
+          paymentStatus={data.payment_status}
+          stillChecking={checking}
+        />
+      )}
 
-      <div className="mt-8 flex flex-wrap gap-2">
-        {timeline.map((status, i) => (
-          <span
-            key={status}
-            className={cn(
-              "border px-3 py-1.5 text-[0.65rem] tracking-[0.16em] uppercase",
-              i <= currentIndex && currentIndex >= 0
-                ? "border-accent bg-accent text-accent-foreground"
-                : "border-border text-muted-foreground",
-            )}
-          >
-            {titleCase(status)}
-          </span>
-        ))}
-        {["cancelled", "refunded"].includes(data.status) && (
-          <span className="border border-destructive px-3 py-1.5 text-[0.65rem] tracking-[0.16em] text-destructive uppercase">
-            {titleCase(data.status)}
-          </span>
-        )}
+      <div className="mt-10 border border-border px-5 py-8 sm:px-8">
+        <p className="eyebrow mb-8">Order tracking</p>
+        <OrderTracker order={data} />
       </div>
 
       <div className="mt-10 grid gap-10 md:grid-cols-2">
@@ -134,7 +134,18 @@ function OrderDetail() {
               value={Number(data.shipping_fee) ? formatPrice(data.shipping_fee) : "Free"}
             />
             <Row label="Total" value={formatPrice(data.total)} />
-            <Row label="Payment" value={titleCase(data.payment_status)} />
+            <Row
+              label="Payment Method"
+              value={isCod ? "Cash on Delivery" : "Online Payment (Razorpay)"}
+            />
+            <Row
+              label="Payment"
+              value={
+                isCod && data.payment_status === "pending"
+                  ? "Due on delivery"
+                  : titleCase(data.payment_status)
+              }
+            />
             {data.razorpay_payment_id && (
               <Row label="Payment reference" value={data.razorpay_payment_id} />
             )}
@@ -198,6 +209,36 @@ function PaymentBanner({
     <div role="status" aria-live="polite" className={cn("mt-6 border p-5", tone)}>
       <p className="font-display text-xl">{title}</p>
       <p className="mt-1 text-sm text-muted-foreground">{body}</p>
+    </div>
+  );
+}
+
+function CodBanner({
+  placed,
+  paymentStatus,
+  status,
+  total,
+}: {
+  placed: boolean;
+  paymentStatus: string;
+  status: string;
+  total: number;
+}) {
+  if (["cancelled", "refunded"].includes(status)) return null;
+  const paid = paymentStatus === "paid";
+  return (
+    <div role="status" aria-live="polite" className="mt-6 border border-accent p-5">
+      {placed && (
+        <p className="font-display text-xl">Thank you — your order is confirmed</p>
+      )}
+      <p className={cn("text-sm", placed && "mt-1")}>
+        <span className="text-muted-foreground">Payment Method: </span>Cash on Delivery
+      </p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        {paid
+          ? `Payment of ${formatPrice(total)} received. Thank you!`
+          : `Pay ${formatPrice(total)} when your order is delivered.`}
+      </p>
     </div>
   );
 }

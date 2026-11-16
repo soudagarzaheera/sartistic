@@ -38,6 +38,7 @@ import { Route as AdminProductsRouteImport } from './routes/admin.products'
 import { Route as AdminReviewsRouteImport } from './routes/admin.reviews'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminLoginRouteImport } from './routes/admin_.login'
+import { Route as ApiShipmentUpdatesRouteImport } from './routes/api.shipment-updates'
 import { Route as CollectionsIndexRouteImport } from './routes/collections.index'
 import { Route as CollectionsSlugRouteImport } from './routes/collections.$slug'
 import { Route as ProductSlugRouteImport } from './routes/product.$slug'
@@ -189,6 +190,11 @@ const AdminLoginRoute = AdminLoginRouteImport.update({
   path: '/admin/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiShipmentUpdatesRoute = ApiShipmentUpdatesRouteImport.update({
+  id: '/api/shipment-updates',
+  path: '/api/shipment-updates',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CollectionsIndexRoute = CollectionsIndexRouteImport.update({
   id: '/collections/',
   path: '/collections/',
@@ -243,6 +249,7 @@ export interface FileRoutesByFullPath {
   '/admin/reviews': typeof AdminReviewsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/login': typeof AdminLoginRoute
+  '/api/shipment-updates': typeof ApiShipmentUpdatesRoute
   '/collections/$slug': typeof CollectionsSlugRoute
   '/product/$slug': typeof ProductSlugRoute
   '/account/': typeof AccountIndexRoute
@@ -277,6 +284,7 @@ export interface FileRoutesByTo {
   '/admin/reviews': typeof AdminReviewsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/login': typeof AdminLoginRoute
+  '/api/shipment-updates': typeof ApiShipmentUpdatesRoute
   '/collections/$slug': typeof CollectionsSlugRoute
   '/product/$slug': typeof ProductSlugRoute
   '/account': typeof AccountIndexRoute
@@ -314,6 +322,7 @@ export interface FileRoutesById {
   '/admin/reviews': typeof AdminReviewsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin_/login': typeof AdminLoginRoute
+  '/api/shipment-updates': typeof ApiShipmentUpdatesRoute
   '/collections/$slug': typeof CollectionsSlugRoute
   '/product/$slug': typeof ProductSlugRoute
   '/account/': typeof AccountIndexRoute
@@ -352,6 +361,7 @@ export interface FileRouteTypes {
     | '/admin/reviews'
     | '/admin/settings'
     | '/admin/login'
+    | '/api/shipment-updates'
     | '/collections/$slug'
     | '/product/$slug'
     | '/account/'
@@ -386,6 +396,7 @@ export interface FileRouteTypes {
     | '/admin/reviews'
     | '/admin/settings'
     | '/admin/login'
+    | '/api/shipment-updates'
     | '/collections/$slug'
     | '/product/$slug'
     | '/account'
@@ -422,6 +433,7 @@ export interface FileRouteTypes {
     | '/admin/reviews'
     | '/admin/settings'
     | '/admin_/login'
+    | '/api/shipment-updates'
     | '/collections/$slug'
     | '/product/$slug'
     | '/account/'
@@ -445,6 +457,7 @@ export interface RootRouteChildren {
   SearchRoute: typeof SearchRoute
   ShopRoute: typeof ShopRoute
   AdminLoginRoute: typeof AdminLoginRoute
+  ApiShipmentUpdatesRoute: typeof ApiShipmentUpdatesRoute
   CollectionsSlugRoute: typeof CollectionsSlugRoute
   ProductSlugRoute: typeof ProductSlugRoute
   CollectionsIndexRoute: typeof CollectionsIndexRoute
@@ -656,6 +669,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/shipment-updates': {
+      id: '/api/shipment-updates'
+      path: '/api/shipment-updates'
+      fullPath: '/api/shipment-updates'
+      preLoaderRoute: typeof ApiShipmentUpdatesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/collections/': {
       id: '/collections/'
       path: '/collections'
@@ -769,6 +789,7 @@ const rootRouteChildren: RootRouteChildren = {
   SearchRoute: SearchRoute,
   ShopRoute: ShopRoute,
   AdminLoginRoute: AdminLoginRoute,
+  ApiShipmentUpdatesRoute: ApiShipmentUpdatesRoute,
   CollectionsSlugRoute: CollectionsSlugRoute,
   ProductSlugRoute: ProductSlugRoute,
   CollectionsIndexRoute: CollectionsIndexRoute,

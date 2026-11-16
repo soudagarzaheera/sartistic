@@ -118,7 +118,7 @@ function AuthPage() {
     <div className="grid min-h-screen lg:grid-cols-2">
       <div className="relative hidden lg:block">
         <img
-          src="/images/image2.jpg"
+          src="/images/image2.jpeg"
           alt="Henna leaves and carved wooden block"
           className="size-full object-cover"
         />

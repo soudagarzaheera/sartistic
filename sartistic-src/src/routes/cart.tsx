@@ -20,7 +20,7 @@ export const Route = createFileRoute("/cart")({
 
 function CartPage() {
   const { items, subtotal, setQuantity, removeItem } = useCart();
-  const shipping = subtotal >= 999 || subtotal === 0 ? 0 : 79;
+  const shipping = subtotal >= 999 || subtotal === 0 ? 0 :40;
 
   return (
     <div className="mx-auto max-w-[1400px] px-5 py-16 lg:px-10">

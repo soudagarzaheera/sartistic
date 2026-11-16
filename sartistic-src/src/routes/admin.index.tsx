@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { testShiprocketConnection, getShiprocketPickupLocations, } from "@/lib/shipping.functions";
 import {
   Bar,
   BarChart,
@@ -24,6 +25,14 @@ export const Route = createFileRoute("/admin/")({
 const COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)", "var(--chart-5)"];
 
 function Dashboard() {
+  const shiprocketTest = useMutation({
+  mutationFn: () => testShiprocketConnection(),
+});
+const pickupLocationsTest = useMutation({
+  mutationFn: () => getShiprocketPickupLocations(),
+});
+
+
   const stats = useQuery({
     queryKey: ["admin", "dashboard"],
     queryFn: async () => {
@@ -112,6 +121,101 @@ function Dashboard() {
   return (
     <div>
       <h1 className="text-4xl">Dashboard</h1>
+
+
+<div className="mt-4 border border-border bg-background p-5">
+  <div className="flex flex-wrap items-center justify-between gap-4">
+    <div>
+      <h2 className="text-xl">Pickup Locations</h2>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Retrieve pickup locations saved in your Shiprocket account.
+      </p>
+    </div>
+
+    <button
+      type="button"
+      onClick={() => pickupLocationsTest.mutate()}
+      disabled={pickupLocationsTest.isPending}
+      className="border border-border px-5 py-2 text-sm disabled:opacity-50"
+    >
+      {pickupLocationsTest.isPending
+        ? "Fetching..."
+        : "Fetch Pickup Locations"}
+    </button>
+  </div>
+
+  
+{pickupLocationsTest.isSuccess && (
+  <div className="mt-4 space-y-3">
+    <p className="text-sm text-green-600">
+      ✓ Pickup locations retrieved successfully.
+    </p>
+
+    {pickupLocationsTest.data.locations.map((location) => (
+      <div
+        key={location.id}
+        className="border border-border p-4 text-sm"
+      >
+        <p className="font-medium">
+          {location.pickupLocation}
+        </p>
+
+        <p className="mt-1 text-muted-foreground">
+          PIN: {location.pinCode} · {location.city}, {location.state}
+        </p>
+
+        <p className="mt-1">
+          Status: {location.status}
+          {location.isPrimary ? " · Primary location" : ""}
+        </p>
+      </div>
+    ))}
+  </div>
+)}
+
+
+  {pickupLocationsTest.isError && (
+    <p className="mt-4 text-sm text-red-600">
+      ✕ {pickupLocationsTest.error.message}
+    </p>
+  )}
+</div>
+
+
+<div className="mt-6 border border-border bg-background p-5">
+  <div className="flex flex-wrap items-center justify-between gap-4">
+    <div>
+      <h2 className="text-xl">Shiprocket Connection</h2>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Verify your Shiprocket API credentials and authentication.
+      </p>
+    </div>
+
+    <button
+      type="button"
+      onClick={() => shiprocketTest.mutate()}
+      disabled={shiprocketTest.isPending}
+      className="border border-border px-5 py-2 text-sm disabled:opacity-50"
+    >
+      {shiprocketTest.isPending
+        ? "Testing..."
+        : "Test Connection"}
+    </button>
+  </div>
+
+  {shiprocketTest.isSuccess && (
+    <p className="mt-4 text-sm text-green-600">
+      ✓ {shiprocketTest.data.message}
+    </p>
+  )}
+
+  {shiprocketTest.isError && (
+    <p className="mt-4 text-sm text-red-600">
+      ✕ {shiprocketTest.error.message}
+    </p>
+  )}
+</div>
+
       <div className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
         {kpis.map((k) => (
           <div key={k.label} className="border border-border bg-background p-5">
@@ -121,73 +225,9 @@ function Dashboard() {
         ))}
       </div>
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-2">
-        <ChartCard title="Sales over time (14 days)">
-          <LineChart data={[...byDay.values()]}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-            <XAxis dataKey="day" fontSize={11} />
-            <YAxis fontSize={11} />
-            <Tooltip />
-            <Line type="monotone" dataKey="sales" stroke="var(--chart-1)" strokeWidth={2} />
-          </LineChart>
-        </ChartCard>
-        <ChartCard title="Orders over time (14 days)">
-          <BarChart data={[...byDay.values()]}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-            <XAxis dataKey="day" fontSize={11} />
-            <YAxis allowDecimals={false} fontSize={11} />
-            <Tooltip />
-            <Bar dataKey="orders" fill="var(--chart-2)" />
-          </BarChart>
-        </ChartCard>
-        <ChartCard title="Top products (units)">
-          <BarChart data={topProducts} layout="vertical">
-            <XAxis type="number" fontSize={11} />
-            <YAxis type="category" dataKey="name" width={140} fontSize={11} />
-            <Tooltip />
-            <Bar dataKey="qty" fill="var(--chart-3)" />
-          </BarChart>
-        </ChartCard>
-        <ChartCard title="Revenue by product">
-          <BarChart data={topProducts}>
-            <XAxis dataKey="name" fontSize={10} />
-            <YAxis fontSize={11} />
-            <Tooltip />
-            <Bar dataKey="revenue" fill="var(--chart-4)" />
-          </BarChart>
-        </ChartCard>
-        <ChartCard title="Order status">
-          <PieChart>
-            <Pie data={statusCounts} dataKey="value" nameKey="name" outerRadius={90} label>
-              {statusCounts.map((_, i) => (
-                <Cell key={i} fill={COLORS[i % COLORS.length]} />
-              ))}
-            </Pie>
-            <Tooltip />
-          </PieChart>
-        </ChartCard>
-        <ChartCard title="Customer growth">
-          <LineChart data={growthData}>
-            <XAxis dataKey="month" fontSize={11} />
-            <YAxis allowDecimals={false} fontSize={11} />
-            <Tooltip />
-            <Line type="monotone" dataKey="customers" stroke="var(--chart-5)" strokeWidth={2} />
-          </LineChart>
-        </ChartCard>
+      
       </div>
-    </div>
+  
   );
 }
 
-function ChartCard({ title, children }: { title: string; children: React.ReactElement }) {
-  return (
-    <div className="border border-border bg-background p-5">
-      <p className="eyebrow">{title}</p>
-      <div className="mt-4 h-64">
-        <ResponsiveContainer width="100%" height="100%">
-          {children}
-        </ResponsiveContainer>
-      </div>
-    </div>
-  );
-}

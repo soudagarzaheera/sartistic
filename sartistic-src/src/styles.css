@@ -1,4 +1,4 @@
-@import "tailwindcss" source(none);
+@import "tailwindcss";
 @source "../src";
 @import "tw-animate-css";
 
@@ -78,7 +78,7 @@
   --muted: oklch(0.945 0.014 83);
   --muted-foreground: oklch(0.505 0.024 60);
 
-  --accent: oklch(0.585 0.108 40);
+  --accent: oklch(69.592% 0.13409 40.739);
   --accent-foreground: oklch(0.985 0.008 86);
 
   --gold: oklch(0.755 0.072 80);

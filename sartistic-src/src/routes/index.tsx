@@ -90,7 +90,7 @@ const DEFAULTS: Record<string, Record<string, unknown>> = {
     heading: "Tradition,\nCrafted Beautifully.",
     subtitle:
       "Discover SARTISTIC Mehndi — thoughtfully presented for moments of beauty, celebration and artistic expression.",
-    image_url: "/images/image1.jpg",
+    image_url: "/images/image1.jpeg",
     image_alt: "Hands adorned with intricate Mehndi patterns resting on ivory silk",
     primary_label: "Shop Mehndi",
     primary_link: "/shop",
@@ -121,7 +121,7 @@ const DEFAULTS: Record<string, Record<string, unknown>> = {
     eyebrow: "Our Story",
     title: "More Than Mehndi.\nIt's an Art Form.",
     body: "SARTISTIC celebrates the beauty of Mehndi as an artistic tradition — the patience of the hand, the rhythm of the line, the quiet ceremony of waiting for colour to appear.\n\nWe take that tradition and give it a modern, premium brand experience: considered presentation, clear information and products made for artists and for celebration.",
-    image_url: "/images/image2.jpg",
+    image_url: "/images/image2.jpeg",
     image_alt: "Henna leaves, paste and a carved Indian printing block",
   },
   why: { eyebrow: "Why SARTISTIC", title: "Six reasons the ritual feels different." },

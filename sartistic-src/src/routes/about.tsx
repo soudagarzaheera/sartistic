@@ -40,11 +40,12 @@ function About() {
 
       <section className="relative">
         <img
-          src="/images/image1.jpg"
+          src="/images/image1.jpeg"
           alt="Mehndi adorned hands on ivory silk"
           loading="lazy"
           className="h-[52vh] w-full object-cover"
         />
+         <div className="absolute inset-0 bg-[#70452b]/20 pointer-events-none" />
       </section>
 
       <section className="mx-auto max-w-[1400px] px-5 py-20 lg:px-10">
@@ -91,7 +92,7 @@ function About() {
           </Reveal>
           <Reveal delay={100} className="order-1 lg:order-2">
             <img
-              src="/images/image2.jpg"
+              src="/images/image2.jpeg"
               alt="Henna leaves and a carved wooden block"
               loading="lazy"
               className="w-full object-cover"

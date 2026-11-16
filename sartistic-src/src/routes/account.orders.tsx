@@ -51,7 +51,12 @@ function Orders() {
               <div className="text-right">
                 <p className="font-display text-xl">{formatPrice(order.total)}</p>
                 <p className="text-xs tracking-[0.14em] text-muted-foreground uppercase">
-                  {titleCase(order.status)} · Payment {titleCase(order.payment_status)}
+                  {titleCase(order.status)} ·{" "}
+                  {order.payment_method === "cod"
+                    ? order.payment_status === "pending"
+                      ? "Cash on Delivery"
+                      : `COD ${titleCase(order.payment_status)}`
+                    : `Payment ${titleCase(order.payment_status)}`}
                 </p>
               </div>
             </div>
@@ -74,8 +79,13 @@ function Orders() {
                 params={{ id: order.id }}
                 className="text-xs tracking-[0.16em] uppercase underline underline-offset-4 hover:text-accent"
               >
-                View details
+                {order.shiprocket_order_id ? "Track order" : "View details"}
               </Link>
+              {order.shiprocket_status && (
+                <span className="ml-4 text-xs text-muted-foreground">
+                  {order.shiprocket_status}
+                </span>
+              )}
             </div>
           </article>
         ))}
