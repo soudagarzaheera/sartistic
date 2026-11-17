@@ -92,7 +92,7 @@ function About() {
           </Reveal>
           <Reveal delay={100} className="order-1 lg:order-2">
             <img
-              src="/images/image2.jpeg"
+              src="/images/image2.jpg"
               alt="Henna leaves and a carved wooden block"
               loading="lazy"
               className="w-full object-cover"
