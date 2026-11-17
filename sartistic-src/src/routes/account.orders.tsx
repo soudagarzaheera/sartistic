@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { formatDate, formatPrice, titleCase } from "@/lib/format";
 import { Button } from "@/components/ui/button";
+import { PHASE_LABELS, shipmentPhase } from "@/lib/tracking";
 
 export const Route = createFileRoute("/account/orders")({
   component: Orders,
@@ -73,17 +74,30 @@ function Orders() {
                 </li>
               ))}
             </ul>
-            <div className="mt-5">
-              <Link
-                to="/account/orders/$id"
-                params={{ id: order.id }}
-                className="text-xs tracking-[0.16em] uppercase underline underline-offset-4 hover:text-accent"
-              >
-                {order.shiprocket_order_id ? "Track order" : "View details"}
-              </Link>
-              {order.shiprocket_status && (
-                <span className="ml-4 text-xs text-muted-foreground">
-                  {order.shiprocket_status}
+            <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2">
+              {["pending", "cancelled"].includes(order.status) ? (
+                <Link
+                  to="/account/orders/$id"
+                  params={{ id: order.id }}
+                  className="text-xs tracking-[0.16em] uppercase underline underline-offset-4 hover:text-accent"
+                >
+                  View details
+                </Link>
+              ) : (
+                <Link
+                  to="/account/orders/$id"
+                  params={{ id: order.id }}
+                  className="inline-flex h-9 items-center border border-foreground px-4 text-xs tracking-[0.16em] uppercase transition-colors hover:bg-foreground hover:text-background"
+                >
+                  Track Order
+                </Link>
+              )}
+              {(order.shiprocket_order_id || order.status === "packed") && (
+                <span className="text-xs text-muted-foreground">
+                  {PHASE_LABELS[shipmentPhase(order)]}
+                  {order.shiprocket_courier && order.shiprocket_awb
+                    ? ` · ${order.shiprocket_courier}`
+                    : ""}
                 </span>
               )}
             </div>

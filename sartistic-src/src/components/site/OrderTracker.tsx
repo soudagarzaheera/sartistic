@@ -15,7 +15,10 @@ import { refreshOrderTracking } from "@/lib/tracking.functions";
 import {
   buildTimeline,
   EXCEPTION_COPY,
+  AWAITING_COURIER_MESSAGE,
   isTrackingFinal,
+  PHASE_LABELS,
+  shipmentPhase,
   STAGE_LABELS,
   TRACKING_FRESH_MS,
   type Stage,
@@ -35,7 +38,11 @@ const ICONS: Record<Stage, LucideIcon> = {
 const DONE = "border-[#5E7D61] bg-[#5E7D61] text-[#FBF8F1]";
 const DONE_LINE = "bg-[#5E7D61]";
 
-export type TrackerOrder = TrackableOrder & { id: string; order_number: string };
+export type TrackerOrder = TrackableOrder & {
+  id: string;
+  order_number: string;
+  pickup_scheduled_at?: string | null;
+};
 
 function formatStamp(d: Date | null, withTime = true) {
   if (!d) return null;
@@ -215,11 +222,21 @@ function TrackingDetails({
   const latest = events[0];
   const visible = showAll ? events : events.slice(0, 5);
 
+  const phase = shipmentPhase(order);
+  const pickupAt = order.pickup_scheduled_at ? new Date(order.pickup_scheduled_at) : null;
   const rows: [string, string | null][] = [
     ["Order ID", order.order_number],
+    ["Shipment status", order.shiprocket_order_id || order.status === "packed" ? PHASE_LABELS[phase] : null],
     ["AWB / Tracking no.", timeline.awb],
     ["Courier partner", timeline.courier],
     ["Order date", formatStamp(new Date(order.created_at), false)],
+    [
+      "Pickup",
+      pickupAt && (phase === "pickup_scheduled" || phase === "awaiting_pickup")
+        ? `Scheduled ${formatStamp(pickupAt, false)}`
+        : null,
+    ],
+    // Only when Shiprocket supplied one.
     ["Estimated delivery", formatStamp(timeline.etd, false)],
     ["Current status", timeline.currentStatus],
     [
@@ -245,11 +262,7 @@ function TrackingDetails({
           ))}
       </dl>
 
-      {!order.shiprocket_order_id && (
-        <p className="mt-4 text-sm text-muted-foreground">
-          Tracking details will appear here once your order is handed to our courier partner.
-        </p>
-      )}
+      <PhaseMessage phase={phase} orderStatus={order.status} />
 
       <div className="mt-6 flex flex-wrap items-center gap-x-6 gap-y-3">
         {timeline.trackUrl && timeline.awb && (
@@ -314,5 +327,24 @@ function TrackingDetails({
         </div>
       )}
     </div>
+  );
+}
+
+/** What to expect next, for the steps before the courier's first scan. */
+function PhaseMessage({ phase, orderStatus }: { phase: ReturnType<typeof shipmentPhase>; orderStatus: string }) {
+  let text: string | null = null;
+  if (phase === "awaiting_awb" || (phase === "not_created" && orderStatus === "packed")) {
+    text = AWAITING_COURIER_MESSAGE;
+  } else if (phase === "not_created" && !["pending", "cancelled", "refunded"].includes(orderStatus)) {
+    text = "Tracking details will appear here once your order is handed to our courier partner.";
+  } else if (phase === "awaiting_pickup" || phase === "pickup_scheduled") {
+    text =
+      "A courier has been assigned. Live tracking updates will begin once the courier collects your parcel.";
+  }
+  if (!text) return null;
+  return (
+    <p role="status" className="mt-4 border-l-2 border-border pl-4 text-sm text-muted-foreground">
+      {text}
+    </p>
   );
 }

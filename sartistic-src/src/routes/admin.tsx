@@ -2,6 +2,7 @@ import { createFileRoute, Link, Outlet, useNavigate, useRouterState } from "@tan
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import {
+  Banknote,
   BarChart3,
   FolderTree,
   Images,
@@ -10,6 +11,7 @@ import {
   Menu,
   MessageSquare,
   Package,
+  RotateCcw,
   Settings,
   ShoppingBag,
   Users,
@@ -39,6 +41,8 @@ const NAV = [
   { to: "/admin/collections", label: "Collections", icon: Layers },
   { to: "/admin/categories", label: "Categories", icon: FolderTree },
   { to: "/admin/orders", label: "Orders", icon: ShoppingBag },
+  { to: "/admin/returns", label: "Return Requests", icon: RotateCcw },
+  { to: "/admin/refunds", label: "Refund Requests", icon: Banknote },
   { to: "/admin/customers", label: "Customers", icon: Users },
   { to: "/admin/gallery", label: "Design Gallery", icon: Images },
   { to: "/admin/reviews", label: "Reviews", icon: MessageSquare },

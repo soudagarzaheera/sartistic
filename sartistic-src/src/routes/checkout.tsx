@@ -343,6 +343,17 @@ function Checkout() {
               at the time of delivery.
             </p>
           )}
+          <p className="mt-3 text-xs text-muted-foreground">
+            Returns and refunds can be requested within 3 days of delivery. See our{" "}
+            <Link to="/return-policy" target="_blank" className="underline underline-offset-4">
+              Return Policy
+            </Link>{" "}
+            and{" "}
+            <Link to="/refund-policy" target="_blank" className="underline underline-offset-4">
+              Refund Policy
+            </Link>
+            .
+          </p>
         </aside>
       </form>
     </div>

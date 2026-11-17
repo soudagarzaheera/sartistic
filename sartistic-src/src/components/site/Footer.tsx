@@ -107,6 +107,14 @@ export function Footer() {
       <div className="border-t border-current/15">
         <div className="mx-auto flex max-w-[1400px] flex-col gap-2 px-5 py-6 text-xs opacity-60 sm:flex-row sm:items-center sm:justify-between lg:px-10">
           <p>© {new Date().getFullYear()} SARTISTIC. All rights reserved.</p>
+          <nav aria-label="Policies" className="flex gap-5">
+            <Link to="/return-policy" className="hover:opacity-100 hover:underline">
+              Return Policy
+            </Link>
+            <Link to="/refund-policy" className="hover:opacity-100 hover:underline">
+              Refund Policy
+            </Link>
+          </nav>
           <p>Please follow the instructions supplied with your product before use.</p>
         </div>
       </div>

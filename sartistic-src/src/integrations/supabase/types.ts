@@ -407,6 +407,13 @@ export type Database = {
           coupon_code: string | null
           created_at: string
           currency: string
+          delivered_at: string | null
+          awb_assigned_at: string | null
+          awb_requested_at: string | null
+          pickup_scheduled_at: string | null
+          pickup_token: string | null
+          pickup_requested_at: string | null
+          shiprocket_status_at: string | null
           discount: number
           id: string
           order_number: string
@@ -448,6 +455,13 @@ export type Database = {
           coupon_code?: string | null
           created_at?: string
           currency?: string
+          delivered_at?: string | null
+          awb_assigned_at?: string | null
+          awb_requested_at?: string | null
+          pickup_scheduled_at?: string | null
+          pickup_token?: string | null
+          pickup_requested_at?: string | null
+          shiprocket_status_at?: string | null
           discount?: number
           id?: string
           order_number: string
@@ -489,6 +503,13 @@ export type Database = {
           coupon_code?: string | null
           created_at?: string
           currency?: string
+          delivered_at?: string | null
+          awb_assigned_at?: string | null
+          awb_requested_at?: string | null
+          pickup_scheduled_at?: string | null
+          pickup_token?: string | null
+          pickup_requested_at?: string | null
+          shiprocket_status_at?: string | null
           discount?: number
           id?: string
           order_number?: string
@@ -993,6 +1014,249 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "order_status_history_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      return_requests: {
+        Row: {
+          admin_remarks: string | null
+          created_at: string
+          customer_message: string | null
+          delivered_at: string
+          details: string | null
+          id: string
+          image_paths: string[]
+          order_id: string
+          order_item_id: string
+          picked_up_at: string | null
+          quantity: number
+          reason: string
+          returned_at: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          window_ends_at: string
+        }
+        Insert: {
+          admin_remarks?: string | null
+          created_at?: string
+          customer_message?: string | null
+          delivered_at: string
+          details?: string | null
+          id?: string
+          image_paths?: string[]
+          order_id: string
+          order_item_id: string
+          picked_up_at?: string | null
+          quantity: number
+          reason: string
+          returned_at?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+          window_ends_at: string
+        }
+        Update: {
+          admin_remarks?: string | null
+          created_at?: string
+          customer_message?: string | null
+          delivered_at?: string
+          details?: string | null
+          id?: string
+          image_paths?: string[]
+          order_id?: string
+          order_item_id?: string
+          picked_up_at?: string | null
+          quantity?: number
+          reason?: string
+          returned_at?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          window_ends_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "return_requests_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "return_requests_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: true
+            referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      refund_requests: {
+        Row: {
+          admin_remarks: string | null
+          approved_amount: number | null
+          created_at: string
+          customer_message: string | null
+          delivered_at: string
+          details: string | null
+          failure_reason: string | null
+          gateway_refund_id: string | null
+          gateway_status: string | null
+          id: string
+          image_paths: string[]
+          order_id: string
+          order_item_id: string
+          payment_method: string
+          processing_started_at: string | null
+          quantity: number
+          razorpay_payment_id: string | null
+          reason: string
+          refund_reference: string | null
+          refunded_at: string | null
+          requested_amount: number
+          return_request_id: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          window_ends_at: string
+        }
+        Insert: {
+          admin_remarks?: string | null
+          approved_amount?: number | null
+          created_at?: string
+          customer_message?: string | null
+          delivered_at: string
+          details?: string | null
+          failure_reason?: string | null
+          gateway_refund_id?: string | null
+          gateway_status?: string | null
+          id?: string
+          image_paths?: string[]
+          order_id: string
+          order_item_id: string
+          payment_method: string
+          processing_started_at?: string | null
+          quantity: number
+          razorpay_payment_id?: string | null
+          reason: string
+          refund_reference?: string | null
+          refunded_at?: string | null
+          requested_amount: number
+          return_request_id?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+          window_ends_at: string
+        }
+        Update: {
+          admin_remarks?: string | null
+          approved_amount?: number | null
+          created_at?: string
+          customer_message?: string | null
+          delivered_at?: string
+          details?: string | null
+          failure_reason?: string | null
+          gateway_refund_id?: string | null
+          gateway_status?: string | null
+          id?: string
+          image_paths?: string[]
+          order_id?: string
+          order_item_id?: string
+          payment_method?: string
+          processing_started_at?: string | null
+          quantity?: number
+          razorpay_payment_id?: string | null
+          reason?: string
+          refund_reference?: string | null
+          refunded_at?: string | null
+          requested_amount?: number
+          return_request_id?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          window_ends_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "refund_requests_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "refund_requests_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: true
+            referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "refund_requests_return_request_id_fkey"
+            columns: ["return_request_id"]
+            isOneToOne: false
+            referencedRelation: "return_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shiprocket_logs: {
+        Row: {
+          created_at: string
+          dedupe_key: string | null
+          event_at: string | null
+          id: string
+          kind: string
+          message: string | null
+          order_id: string | null
+          outcome: string
+          payload: Json | null
+          shiprocket_status: string | null
+        }
+        Insert: {
+          created_at?: string
+          dedupe_key?: string | null
+          event_at?: string | null
+          id?: string
+          kind: string
+          message?: string | null
+          order_id?: string | null
+          outcome: string
+          payload?: Json | null
+          shiprocket_status?: string | null
+        }
+        Update: {
+          created_at?: string
+          dedupe_key?: string | null
+          event_at?: string | null
+          id?: string
+          kind?: string
+          message?: string | null
+          order_id?: string | null
+          outcome?: string
+          payload?: Json | null
+          shiprocket_status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shiprocket_logs_order_id_fkey"
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"

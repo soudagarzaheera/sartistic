@@ -58,7 +58,7 @@ export async function optimizeImage(file: File): Promise<File> {
   }
 }
 
-function extensionFor(file: File) {
+export function extensionFor(file: File) {
   const fromType: Record<string, string> = {
     "image/jpeg": "jpg",
     "image/png": "png",

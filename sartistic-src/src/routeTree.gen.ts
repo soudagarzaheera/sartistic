@@ -18,7 +18,9 @@ import { Route as CartRouteImport } from './routes/cart'
 import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as ContactRouteImport } from './routes/contact'
 import { Route as MehndiArtRouteImport } from './routes/mehndi-art'
+import { Route as RefundPolicyRouteImport } from './routes/refund-policy'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as ReturnPolicyRouteImport } from './routes/return-policy'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as ShopRouteImport } from './routes/shop'
 import { Route as AccountIndexRouteImport } from './routes/account.index'
@@ -35,6 +37,8 @@ import { Route as AdminHomepageRouteImport } from './routes/admin.homepage'
 import { Route as AdminImagesRouteImport } from './routes/admin.images'
 import { Route as AdminOrdersRouteImport } from './routes/admin.orders'
 import { Route as AdminProductsRouteImport } from './routes/admin.products'
+import { Route as AdminRefundsRouteImport } from './routes/admin.refunds'
+import { Route as AdminReturnsRouteImport } from './routes/admin.returns'
 import { Route as AdminReviewsRouteImport } from './routes/admin.reviews'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
 import { Route as AdminLoginRouteImport } from './routes/admin_.login'
@@ -43,6 +47,7 @@ import { Route as CollectionsIndexRouteImport } from './routes/collections.index
 import { Route as CollectionsSlugRouteImport } from './routes/collections.$slug'
 import { Route as ProductSlugRouteImport } from './routes/product.$slug'
 import { Route as AccountOrdersIdRouteImport } from './routes/account.orders.$id'
+import { Route as ApiCronSyncTrackingRouteImport } from './routes/api.cron.sync-tracking'
 import { Route as ApiRazorpayWebhookRouteImport } from './routes/api.razorpay.webhook'
 
 const IndexRoute = IndexRouteImport.update({
@@ -90,9 +95,19 @@ const MehndiArtRoute = MehndiArtRouteImport.update({
   path: '/mehndi-art',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RefundPolicyRoute = RefundPolicyRouteImport.update({
+  id: '/refund-policy',
+  path: '/refund-policy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
   path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReturnPolicyRoute = ReturnPolicyRouteImport.update({
+  id: '/return-policy',
+  path: '/return-policy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SearchRoute = SearchRouteImport.update({
@@ -175,6 +190,16 @@ const AdminProductsRoute = AdminProductsRouteImport.update({
   path: '/products',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminRefundsRoute = AdminRefundsRouteImport.update({
+  id: '/refunds',
+  path: '/refunds',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminReturnsRoute = AdminReturnsRouteImport.update({
+  id: '/returns',
+  path: '/returns',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminReviewsRoute = AdminReviewsRouteImport.update({
   id: '/reviews',
   path: '/reviews',
@@ -215,6 +240,11 @@ const AccountOrdersIdRoute = AccountOrdersIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => AccountOrdersRoute,
 } as any)
+const ApiCronSyncTrackingRoute = ApiCronSyncTrackingRouteImport.update({
+  id: '/api/cron/sync-tracking',
+  path: '/api/cron/sync-tracking',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiRazorpayWebhookRoute = ApiRazorpayWebhookRouteImport.update({
   id: '/api/razorpay/webhook',
   path: '/api/razorpay/webhook',
@@ -231,7 +261,9 @@ export interface FileRoutesByFullPath {
   '/checkout': typeof CheckoutRoute
   '/contact': typeof ContactRoute
   '/mehndi-art': typeof MehndiArtRoute
+  '/refund-policy': typeof RefundPolicyRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/return-policy': typeof ReturnPolicyRoute
   '/search': typeof SearchRoute
   '/shop': typeof ShopRoute
   '/account/addresses': typeof AccountAddressesRoute
@@ -246,6 +278,8 @@ export interface FileRoutesByFullPath {
   '/admin/images': typeof AdminImagesRoute
   '/admin/orders': typeof AdminOrdersRoute
   '/admin/products': typeof AdminProductsRoute
+  '/admin/refunds': typeof AdminRefundsRoute
+  '/admin/returns': typeof AdminReturnsRoute
   '/admin/reviews': typeof AdminReviewsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/login': typeof AdminLoginRoute
@@ -256,6 +290,7 @@ export interface FileRoutesByFullPath {
   '/admin/': typeof AdminIndexRoute
   '/collections/': typeof CollectionsIndexRoute
   '/account/orders/$id': typeof AccountOrdersIdRoute
+  '/api/cron/sync-tracking': typeof ApiCronSyncTrackingRoute
   '/api/razorpay/webhook': typeof ApiRazorpayWebhookRoute
 }
 export interface FileRoutesByTo {
@@ -266,7 +301,9 @@ export interface FileRoutesByTo {
   '/checkout': typeof CheckoutRoute
   '/contact': typeof ContactRoute
   '/mehndi-art': typeof MehndiArtRoute
+  '/refund-policy': typeof RefundPolicyRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/return-policy': typeof ReturnPolicyRoute
   '/search': typeof SearchRoute
   '/shop': typeof ShopRoute
   '/account/addresses': typeof AccountAddressesRoute
@@ -281,6 +318,8 @@ export interface FileRoutesByTo {
   '/admin/images': typeof AdminImagesRoute
   '/admin/orders': typeof AdminOrdersRoute
   '/admin/products': typeof AdminProductsRoute
+  '/admin/refunds': typeof AdminRefundsRoute
+  '/admin/returns': typeof AdminReturnsRoute
   '/admin/reviews': typeof AdminReviewsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/login': typeof AdminLoginRoute
@@ -291,6 +330,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminIndexRoute
   '/collections': typeof CollectionsIndexRoute
   '/account/orders/$id': typeof AccountOrdersIdRoute
+  '/api/cron/sync-tracking': typeof ApiCronSyncTrackingRoute
   '/api/razorpay/webhook': typeof ApiRazorpayWebhookRoute
 }
 export interface FileRoutesById {
@@ -304,7 +344,9 @@ export interface FileRoutesById {
   '/checkout': typeof CheckoutRoute
   '/contact': typeof ContactRoute
   '/mehndi-art': typeof MehndiArtRoute
+  '/refund-policy': typeof RefundPolicyRoute
   '/reset-password': typeof ResetPasswordRoute
+  '/return-policy': typeof ReturnPolicyRoute
   '/search': typeof SearchRoute
   '/shop': typeof ShopRoute
   '/account/addresses': typeof AccountAddressesRoute
@@ -319,6 +361,8 @@ export interface FileRoutesById {
   '/admin/images': typeof AdminImagesRoute
   '/admin/orders': typeof AdminOrdersRoute
   '/admin/products': typeof AdminProductsRoute
+  '/admin/refunds': typeof AdminRefundsRoute
+  '/admin/returns': typeof AdminReturnsRoute
   '/admin/reviews': typeof AdminReviewsRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/admin_/login': typeof AdminLoginRoute
@@ -329,6 +373,7 @@ export interface FileRoutesById {
   '/admin/': typeof AdminIndexRoute
   '/collections/': typeof CollectionsIndexRoute
   '/account/orders/$id': typeof AccountOrdersIdRoute
+  '/api/cron/sync-tracking': typeof ApiCronSyncTrackingRoute
   '/api/razorpay/webhook': typeof ApiRazorpayWebhookRoute
 }
 export interface FileRouteTypes {
@@ -343,7 +388,9 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/contact'
     | '/mehndi-art'
+    | '/refund-policy'
     | '/reset-password'
+    | '/return-policy'
     | '/search'
     | '/shop'
     | '/account/addresses'
@@ -358,6 +405,8 @@ export interface FileRouteTypes {
     | '/admin/images'
     | '/admin/orders'
     | '/admin/products'
+    | '/admin/refunds'
+    | '/admin/returns'
     | '/admin/reviews'
     | '/admin/settings'
     | '/admin/login'
@@ -368,6 +417,7 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/collections/'
     | '/account/orders/$id'
+    | '/api/cron/sync-tracking'
     | '/api/razorpay/webhook'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -378,7 +428,9 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/contact'
     | '/mehndi-art'
+    | '/refund-policy'
     | '/reset-password'
+    | '/return-policy'
     | '/search'
     | '/shop'
     | '/account/addresses'
@@ -393,6 +445,8 @@ export interface FileRouteTypes {
     | '/admin/images'
     | '/admin/orders'
     | '/admin/products'
+    | '/admin/refunds'
+    | '/admin/returns'
     | '/admin/reviews'
     | '/admin/settings'
     | '/admin/login'
@@ -403,6 +457,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/collections'
     | '/account/orders/$id'
+    | '/api/cron/sync-tracking'
     | '/api/razorpay/webhook'
   id:
     | '__root__'
@@ -415,7 +470,9 @@ export interface FileRouteTypes {
     | '/checkout'
     | '/contact'
     | '/mehndi-art'
+    | '/refund-policy'
     | '/reset-password'
+    | '/return-policy'
     | '/search'
     | '/shop'
     | '/account/addresses'
@@ -430,6 +487,8 @@ export interface FileRouteTypes {
     | '/admin/images'
     | '/admin/orders'
     | '/admin/products'
+    | '/admin/refunds'
+    | '/admin/returns'
     | '/admin/reviews'
     | '/admin/settings'
     | '/admin_/login'
@@ -440,6 +499,7 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/collections/'
     | '/account/orders/$id'
+    | '/api/cron/sync-tracking'
     | '/api/razorpay/webhook'
   fileRoutesById: FileRoutesById
 }
@@ -453,7 +513,9 @@ export interface RootRouteChildren {
   CheckoutRoute: typeof CheckoutRoute
   ContactRoute: typeof ContactRoute
   MehndiArtRoute: typeof MehndiArtRoute
+  RefundPolicyRoute: typeof RefundPolicyRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
+  ReturnPolicyRoute: typeof ReturnPolicyRoute
   SearchRoute: typeof SearchRoute
   ShopRoute: typeof ShopRoute
   AdminLoginRoute: typeof AdminLoginRoute
@@ -461,6 +523,7 @@ export interface RootRouteChildren {
   CollectionsSlugRoute: typeof CollectionsSlugRoute
   ProductSlugRoute: typeof ProductSlugRoute
   CollectionsIndexRoute: typeof CollectionsIndexRoute
+  ApiCronSyncTrackingRoute: typeof ApiCronSyncTrackingRoute
   ApiRazorpayWebhookRoute: typeof ApiRazorpayWebhookRoute
 }
 
@@ -529,11 +592,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MehndiArtRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/refund-policy': {
+      id: '/refund-policy'
+      path: '/refund-policy'
+      fullPath: '/refund-policy'
+      preLoaderRoute: typeof RefundPolicyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/reset-password': {
       id: '/reset-password'
       path: '/reset-password'
       fullPath: '/reset-password'
       preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/return-policy': {
+      id: '/return-policy'
+      path: '/return-policy'
+      fullPath: '/return-policy'
+      preLoaderRoute: typeof ReturnPolicyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/search': {
@@ -648,6 +725,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminProductsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/refunds': {
+      id: '/admin/refunds'
+      path: '/refunds'
+      fullPath: '/admin/refunds'
+      preLoaderRoute: typeof AdminRefundsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/returns': {
+      id: '/admin/returns'
+      path: '/returns'
+      fullPath: '/admin/returns'
+      preLoaderRoute: typeof AdminReturnsRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/reviews': {
       id: '/admin/reviews'
       path: '/reviews'
@@ -704,6 +795,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AccountOrdersIdRouteImport
       parentRoute: typeof AccountOrdersRoute
     }
+    '/api/cron/sync-tracking': {
+      id: '/api/cron/sync-tracking'
+      path: '/api/cron/sync-tracking'
+      fullPath: '/api/cron/sync-tracking'
+      preLoaderRoute: typeof ApiCronSyncTrackingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/razorpay/webhook': {
       id: '/api/razorpay/webhook'
       path: '/api/razorpay/webhook'
@@ -754,6 +852,8 @@ interface AdminRouteChildren {
   AdminImagesRoute: typeof AdminImagesRoute
   AdminOrdersRoute: typeof AdminOrdersRoute
   AdminProductsRoute: typeof AdminProductsRoute
+  AdminRefundsRoute: typeof AdminRefundsRoute
+  AdminReturnsRoute: typeof AdminReturnsRoute
   AdminReviewsRoute: typeof AdminReviewsRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
   AdminIndexRoute: typeof AdminIndexRoute
@@ -768,6 +868,8 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminImagesRoute: AdminImagesRoute,
   AdminOrdersRoute: AdminOrdersRoute,
   AdminProductsRoute: AdminProductsRoute,
+  AdminRefundsRoute: AdminRefundsRoute,
+  AdminReturnsRoute: AdminReturnsRoute,
   AdminReviewsRoute: AdminReviewsRoute,
   AdminSettingsRoute: AdminSettingsRoute,
   AdminIndexRoute: AdminIndexRoute,
@@ -785,7 +887,9 @@ const rootRouteChildren: RootRouteChildren = {
   CheckoutRoute: CheckoutRoute,
   ContactRoute: ContactRoute,
   MehndiArtRoute: MehndiArtRoute,
+  RefundPolicyRoute: RefundPolicyRoute,
   ResetPasswordRoute: ResetPasswordRoute,
+  ReturnPolicyRoute: ReturnPolicyRoute,
   SearchRoute: SearchRoute,
   ShopRoute: ShopRoute,
   AdminLoginRoute: AdminLoginRoute,
@@ -793,6 +897,7 @@ const rootRouteChildren: RootRouteChildren = {
   CollectionsSlugRoute: CollectionsSlugRoute,
   ProductSlugRoute: ProductSlugRoute,
   CollectionsIndexRoute: CollectionsIndexRoute,
+  ApiCronSyncTrackingRoute: ApiCronSyncTrackingRoute,
   ApiRazorpayWebhookRoute: ApiRazorpayWebhookRoute,
 }
 export const routeTree = rootRouteImport

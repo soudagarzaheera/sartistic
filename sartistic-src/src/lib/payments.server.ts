@@ -183,6 +183,7 @@ type RazorpayWebhookEvent = {
   payload?: {
     payment?: { entity?: RazorpayPaymentEntity };
     order?: { entity?: RazorpayOrderEntity };
+    refund?: { entity?: Parameters<typeof import("@/lib/refunds.server").handleRefundWebhook>[0] };
   };
 };
 
@@ -250,6 +251,16 @@ export async function handleRazorpayWebhook(request: Request): Promise<Response>
         return await handleCaptured(eventId, type, payment, rzpOrder);
       case "payment.failed":
         return await handleFailed(eventId, payment);
+      // Refunds issued from the admin Refund Requests page. Retries and
+      // duplicates are harmless: each status change is conditional.
+      case "refund.created":
+      case "refund.processed":
+      case "refund.failed": {
+        const { handleRefundWebhook } = await import("@/lib/refunds.server");
+        const outcome = await handleRefundWebhook(event.payload?.refund?.entity);
+        console.info(`${WEBHOOK_LOG} ${type}: ${outcome} (event ${eventId})`);
+        return json(200, { ok: true, outcome });
+      }
       default:
         return json(200, { ok: true, ignored: type });
     }

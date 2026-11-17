@@ -187,11 +187,25 @@ export const createShiprocketShipment = createServerFn({ method: "POST" })
         // Shiprocket answered with an error, so nothing was created: safe to retry.
         await releaseClaim();
         console.error(`[shiprocket] Create order ${order.order_number} rejected: ${err.message}`);
+        const { logShiprocket } = await import("@/lib/shipment.server");
+        await logShiprocket({
+          order_id: order.id,
+          kind: "shipment",
+          outcome: "error",
+          message: `Shiprocket: ${err.detail}`,
+        });
         throw new Error(`Shiprocket rejected the order: ${err.detail}`);
       }
       // No answer (network/timeout): Shiprocket may or may not have created
       // it, so the claim is kept to block an immediate duplicate.
       console.error(`[shiprocket] Create order ${order.order_number} failed:`, err);
+      const { logShiprocket } = await import("@/lib/shipment.server");
+      await logShiprocket({
+        order_id: order.id,
+        kind: "shipment",
+        outcome: "error",
+        message: "No response from Shiprocket while creating the order (outcome unknown).",
+      });
       throw new Error(
         "Couldn't reach Shiprocket. Check the Shiprocket dashboard for this order number before retrying (retry is possible after 10 minutes).",
       );
@@ -230,4 +244,39 @@ export const createShiprocketShipment = createServerFn({ method: "POST" })
       shipmentId: String(result.shipment_id),
       awb,
     };
+  });
+
+// ---------------------------------------------------------------------------
+// Courier (AWB) and pickup — the steps that make a shipment trackable.
+// Each is safe to retry: see src/lib/shipment.server.ts.
+// ---------------------------------------------------------------------------
+
+const orderIdSchema = z.object({ orderId: z.string().uuid() });
+
+export const getShiprocketCouriers = createServerFn({ method: "POST" })
+  .middleware([requireShippingAdmin])
+  .inputValidator((data: unknown) => orderIdSchema.parse(data))
+  .handler(async ({ data }) => {
+    const { listCouriers } = await import("@/lib/shipment.server");
+    return listCouriers(data.orderId);
+  });
+
+export const assignShiprocketAwb = createServerFn({ method: "POST" })
+  .middleware([requireShippingAdmin])
+  .inputValidator((data: unknown) =>
+    orderIdSchema
+      .extend({ courierId: z.number().int().positive().optional() })
+      .parse(data),
+  )
+  .handler(async ({ data }) => {
+    const { assignAwb } = await import("@/lib/shipment.server");
+    return assignAwb(data.orderId, data.courierId);
+  });
+
+export const scheduleShiprocketPickup = createServerFn({ method: "POST" })
+  .middleware([requireShippingAdmin])
+  .inputValidator((data: unknown) => orderIdSchema.parse(data))
+  .handler(async ({ data }) => {
+    const { schedulePickup } = await import("@/lib/shipment.server");
+    return schedulePickup(data.orderId);
   });

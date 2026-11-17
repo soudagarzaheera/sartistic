@@ -106,6 +106,14 @@ export function parseShiprocketDate(value: unknown): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
+/** Webhook times come as "2026-11-16 14:23:18" or "16 11 2026 14:23:18" (IST). */
+export function parseWebhookTime(value: unknown): Date | null {
+  if (typeof value !== "string") return null;
+  const dmy = /^(\d{2})[ -/](\d{2})[ -/](\d{4})[ T](\d{2}:\d{2}(?::\d{2})?)/.exec(value.trim());
+  if (dmy) return parseShiprocketDate(`${dmy[3]}-${dmy[2]}-${dmy[1]} ${dmy[4]}`);
+  return parseShiprocketDate(value);
+}
+
 export function parseTracking(raw: unknown): ParsedTracking | null {
   if (!isObj(raw)) return null;
   const track = Array.isArray(raw["shipment_track"]) ? raw["shipment_track"].filter(isObj) : [];
@@ -381,3 +389,99 @@ export function autoAdvanceFrom(next: AutoStatus) {
 
 /** How long stored tracking is considered fresh before Shiprocket is asked again. */
 export const TRACKING_FRESH_MS = 15 * 60 * 1000;
+
+// ---------------------------------------------------------------------------
+// Shiprocket order snapshot (GET /orders/show/{id})
+// ---------------------------------------------------------------------------
+
+/**
+ * What Shiprocket's order record says about courier, AWB and pickup. The
+ * tracking API has nothing to report until the courier scans the parcel, so
+ * this is the only source for the steps before pickup.
+ */
+export type ShiprocketOrderSnapshot = {
+  status: string | null;
+  awb: string | null;
+  courier: string | null;
+  pickupScheduledAt: Date | null;
+  pickupToken: string | null;
+  etd: Date | null;
+};
+
+export function parseShiprocketOrder(body: unknown): ShiprocketOrderSnapshot | null {
+  const data = isObj(body) && isObj(body["data"]) ? body["data"] : null;
+  if (!data) return null;
+  const rawShipments = data["shipments"];
+  const shipment = Array.isArray(rawShipments)
+    ? (rawShipments.find(isObj) ?? {})
+    : isObj(rawShipments)
+      ? rawShipments
+      : {};
+  const awbData = isObj(data["awb_data"]) ? data["awb_data"] : {};
+  const text = (v: unknown) =>
+    typeof v === "number" ? String(v) : str(v);
+  return {
+    status: str(data["status"]),
+    awb: text(shipment["awb"]) ?? text(awbData["awb"]),
+    courier: str(shipment["courier"]) ?? str(data["courier_name"]),
+    pickupScheduledAt: parseShiprocketDate(shipment["pickup_scheduled_date"]),
+    pickupToken: text(shipment["pickup_token_number"]),
+    etd: parseShiprocketDate(shipment["etd"]) ?? parseShiprocketDate(data["etd"]),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Shipment phase (customer & admin wording)
+// ---------------------------------------------------------------------------
+
+export type ShipmentPhase =
+  | "not_created"
+  | "awaiting_awb"
+  | "awaiting_pickup"
+  | "pickup_scheduled"
+  | "in_transit"
+  | "out_for_delivery"
+  | "delivered"
+  | "returning"
+  | "returned"
+  | "cancelled";
+
+export type PhaseOrder = TrackableOrder & {
+  pickup_scheduled_at?: string | null;
+};
+
+export const AWAITING_COURIER_MESSAGE =
+  "Your order has been packed and is awaiting courier assignment. Tracking details will be available once the courier is assigned.";
+
+/**
+ * Where the shipment really is, from stored Shiprocket data only. "Packed"
+ * on our side never implies a courier, an AWB or a pickup.
+ */
+export function shipmentPhase(order: PhaseOrder): ShipmentPhase {
+  const t = buildTimeline(order);
+  if (t.exception === "cancelled") return "cancelled";
+  if (t.exception === "returned") return "returned";
+  if (t.exception === "rto") return "returning";
+  if (t.stages[3]!.state === "complete") return "delivered";
+  if (!order.shiprocket_order_id) return "not_created";
+  if (/OUT FOR DELIVERY/i.test(t.currentStatus ?? "")) return "out_for_delivery";
+  if (t.stages[2]!.state !== "upcoming") return "in_transit";
+  if (!t.awb) return "awaiting_awb";
+  if (order.pickup_scheduled_at || /PICKUP (SCHEDULED|GENERATED|QUEUED)|OUT FOR PICKUP/i.test(t.currentStatus ?? "")) {
+    return "pickup_scheduled";
+  }
+  return "awaiting_pickup";
+}
+
+export const PHASE_LABELS: Record<ShipmentPhase, string> = {
+  not_created: "Shipment not created",
+  awaiting_awb: "Awaiting courier assignment",
+  awaiting_pickup: "Courier assigned · awaiting pickup",
+  pickup_scheduled: "Pickup scheduled",
+  in_transit: "In transit",
+  out_for_delivery: "Out for delivery",
+  delivered: "Delivered",
+  returning: "Returning to sender",
+  returned: "Returned to sender",
+  cancelled: "Shipment cancelled",
+};

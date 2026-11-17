@@ -1,15 +1,20 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { ChevronDown, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { markCodPaymentReceived } from "@/lib/admin.functions";
-import { createShiprocketShipment } from "@/lib/shipping.functions";
+import {
+  assignShiprocketAwb,
+  createShiprocketShipment,
+  getShiprocketCouriers,
+  scheduleShiprocketPickup,
+} from "@/lib/shipping.functions";
 import { refreshOrderTracking } from "@/lib/tracking.functions";
-import { buildTimeline, EXCEPTION_COPY } from "@/lib/tracking";
+import { buildTimeline, EXCEPTION_COPY, PHASE_LABELS, shipmentPhase } from "@/lib/tracking";
 import { OrderTracker } from "@/components/site/OrderTracker";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
@@ -446,6 +451,8 @@ function OrderDetail({
         </Panel>
       )}
 
+      {(o.shiprocket_order_id || o.shipment_requested_at) && <ShiprocketLogPanel orderId={o.id} />}
+
       <Panel title="History" className="lg:col-span-3">
         <ol className="space-y-2 text-sm">
           <li className="flex gap-3">
@@ -493,31 +500,12 @@ function ShipmentPanel({
     breadthCm: "10",
     heightCm: "8",
   });
+  const [dispatch, setDispatch] = useState(true);
+  const assignAwb = useServerFn(assignShiprocketAwb);
+  const schedulePickup = useServerFn(scheduleShiprocketPickup);
   const isCod = o.payment_method === "cod";
 
-  if (o.shiprocket_order_id) {
-    return (
-      <Panel title="Shipment">
-        <div className="space-y-1 text-xs break-all text-muted-foreground">
-          <p>Shiprocket order: {o.shiprocket_order_id}</p>
-          <p>Shipment: {o.shiprocket_shipment_id ?? "—"}</p>
-          <p>AWB: {o.shiprocket_awb ?? "Not assigned yet — assign a courier in Shiprocket"}</p>
-          <p>Type: {isCod ? `COD · collect ${formatPrice(o.total)}` : "Prepaid"}</p>
-          {o.shipment_created_at && <p>Created {formatDateTime(o.shipment_created_at)}</p>}
-        </div>
-        {o.shiprocket_awb && (
-          <a
-            href={trackingUrl(o.shiprocket_awb)}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-2 inline-block text-xs underline underline-offset-4"
-          >
-            Track shipment
-          </a>
-        )}
-      </Panel>
-    );
-  }
+  if (o.shiprocket_order_id) return <ShipmentOps order={o} onChanged={onChanged} />;
 
   const blocked = ["pending", "cancelled", "refunded"].includes(o.status)
     ? `A ${o.status} order can't be shipped.`
@@ -554,6 +542,14 @@ function ShipmentPanel({
           ? `Shiprocket order ${result.shiprocketOrderId} created`
           : "This order already has a Shiprocket shipment",
       );
+      if (dispatch) {
+        // Without a courier (AWB) and a pickup, Shiprocket leaves the order
+        // as NEW and nothing can be tracked. Each step is safe to retry.
+        const awb = await assignAwb({ data: { orderId: o.id } });
+        toast.success(`Courier assigned · AWB ${awb.awb}${awb.courier ? ` (${awb.courier})` : ""}`);
+        await schedulePickup({ data: { orderId: o.id } });
+        toast.success("Pickup scheduled with the courier");
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Couldn't create the shipment");
     } finally {
@@ -595,6 +591,16 @@ function ShipmentPanel({
               </label>
             ))}
           </div>
+          <label className="flex items-start gap-2 text-xs text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={dispatch}
+              onChange={(e) => setDispatch(e.target.checked)}
+              className="mt-0.5"
+            />
+            Also assign a courier (AWB) and schedule pickup — needed before the parcel can be
+            tracked
+          </label>
           <Button
             type="button"
             size="sm"
@@ -626,5 +632,241 @@ function Row({ label, value, strong }: { label: string; value: string; strong?: 
       <dt className={strong ? undefined : "text-muted-foreground"}>{label}</dt>
       <dd>{value}</dd>
     </div>
+  );
+}
+
+type Courier = Awaited<ReturnType<typeof getShiprocketCouriers>>[number];
+
+/**
+ * Shipment state and the actions that move it forward. Every action is safe
+ * to retry: the server re-reads Shiprocket first, so it never assigns a
+ * second AWB or books a second pickup.
+ */
+function ShipmentOps({ order: o, onChanged }: { order: Order; onChanged: () => void }) {
+  const assign = useServerFn(assignShiprocketAwb);
+  const pickup = useServerFn(scheduleShiprocketPickup);
+  const loadCouriers = useServerFn(getShiprocketCouriers);
+  const refresh = useServerFn(refreshOrderTracking);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [couriers, setCouriers] = useState<Courier[] | null>(null);
+  const [courierId, setCourierId] = useState("");
+
+  const phase = shipmentPhase(o);
+  const timeline = buildTimeline(o);
+  const closed =
+    ["cancelled", "refunded"].includes(o.status) ||
+    ["cancelled", "returned", "returning", "delivered"].includes(phase);
+  const isCod = o.payment_method === "cod";
+
+  async function run(label: string, action: () => Promise<string>) {
+    setBusy(label);
+    try {
+      toast.success(await action());
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Shiprocket request failed");
+    } finally {
+      setBusy(null);
+      onChanged();
+    }
+  }
+
+  const check = () =>
+    run("check", async () => {
+      const r = await refresh({ data: { orderId: o.id, force: true } });
+      if (r.outcome === "unavailable") throw new Error(r.reason);
+      if (r.outcome === "fresh") return "Checked less than a minute ago";
+      return r.outcome === "synced" && r.orderStatus
+        ? `Updated from Shiprocket · order moved to ${titleCase(r.orderStatus)}`
+        : "Updated from Shiprocket";
+    });
+
+  const assignAwb = () =>
+    run("awb", async () => {
+      const r = await assign({
+        data: { orderId: o.id, ...(courierId ? { courierId: Number(courierId) } : {}) },
+      });
+      return `${r.alreadyAssigned ? "Already assigned" : "Courier assigned"} · AWB ${r.awb}${r.courier ? ` (${r.courier})` : ""}`;
+    });
+
+  const bookPickup = () =>
+    run("pickup", async () => {
+      const r = await pickup({ data: { orderId: o.id } });
+      return r.alreadyScheduled ? "Pickup was already scheduled" : "Pickup scheduled";
+    });
+
+  async function showCouriers() {
+    setBusy("couriers");
+    try {
+      setCouriers(await loadCouriers({ data: { orderId: o.id } }));
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't load couriers");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const pickupText = o.pickup_scheduled_at
+    ? `Scheduled ${formatDateTime(o.pickup_scheduled_at)}${o.pickup_token ? ` · ${o.pickup_token}` : ""}`
+    : o.shiprocket_awb
+      ? "Not scheduled"
+      : "Needs a courier first";
+  const phaseTone =
+    phase === "delivered" ? "good" : ["cancelled", "returned", "returning"].includes(phase) ? "bad" : "neutral";
+
+  return (
+    <Panel title="Shipment">
+      <dl className="space-y-1 text-xs">
+        <ShipRow label="Shipment status">
+          <StatusPill tone={phaseTone}>{PHASE_LABELS[phase]}</StatusPill>
+        </ShipRow>
+        <ShipRow label="Shiprocket status">{o.shiprocket_status ?? "—"}</ShipRow>
+        <ShipRow label="Shiprocket order">{o.shiprocket_order_id}</ShipRow>
+        <ShipRow label="Shipment ID">{o.shiprocket_shipment_id ?? "—"}</ShipRow>
+        <ShipRow label="AWB">{o.shiprocket_awb ?? "Not assigned"}</ShipRow>
+        <ShipRow label="Courier">{o.shiprocket_courier ?? "—"}</ShipRow>
+        <ShipRow label="Pickup">{pickupText}</ShipRow>
+        <ShipRow label="Type">{isCod ? `COD · collect ${formatPrice(o.total)}` : "Prepaid"}</ShipRow>
+        <ShipRow label="Tracking URL">
+          {timeline.trackUrl && timeline.awb ? (
+            <a
+              href={timeline.trackUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="underline underline-offset-4"
+            >
+              Open tracking
+            </a>
+          ) : (
+            "Available once an AWB is assigned"
+          )}
+        </ShipRow>
+        <ShipRow label="Last tracking update">
+          {o.tracking_synced_at ? formatDateTime(o.tracking_synced_at) : "Never"}
+        </ShipRow>
+        {o.shipment_created_at && (
+          <ShipRow label="Shipment created">{formatDateTime(o.shipment_created_at)}</ShipRow>
+        )}
+        {o.awb_assigned_at && (
+          <ShipRow label="AWB assigned">{formatDateTime(o.awb_assigned_at)}</ShipRow>
+        )}
+      </dl>
+
+      <div className="mt-4 space-y-2">
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={Boolean(busy)}
+          onClick={() => void check()}
+          className="w-full rounded-none"
+        >
+          {busy === "check" ? "Checking…" : "Check / refresh tracking"}
+        </Button>
+
+        {!o.shiprocket_awb && !closed && (
+          <div className="space-y-2 border-t border-border pt-3">
+            {couriers ? (
+              <select
+                value={courierId}
+                onChange={(e) => setCourierId(e.target.value)}
+                className={selectClass}
+              >
+                <option value="">Shiprocket chooses (courier priority)</option>
+                {couriers.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} · {formatPrice(c.rate)}
+                    {c.etd ? ` · ETD ${c.etd}` : ""}
+                    {c.recommended ? " · recommended" : ""}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <button
+                type="button"
+                disabled={Boolean(busy)}
+                onClick={() => void showCouriers()}
+                className="text-xs underline underline-offset-4 disabled:opacity-50"
+              >
+                {busy === "couriers" ? "Loading couriers…" : "Choose a courier (optional)"}
+              </button>
+            )}
+            <Button
+              type="button"
+              size="sm"
+              disabled={Boolean(busy)}
+              onClick={() => void assignAwb()}
+              className="w-full rounded-none"
+            >
+              {busy === "awb" ? "Assigning…" : "Assign courier (AWB)"}
+            </Button>
+          </div>
+        )}
+
+        {o.shiprocket_awb && !o.pickup_scheduled_at && !closed && phase === "awaiting_pickup" && (
+          <Button
+            type="button"
+            size="sm"
+            disabled={Boolean(busy)}
+            onClick={() => void bookPickup()}
+            className="w-full rounded-none"
+          >
+            {busy === "pickup" ? "Scheduling…" : "Schedule pickup"}
+          </Button>
+        )}
+      </div>
+    </Panel>
+  );
+}
+
+function ShipRow({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex justify-between gap-3">
+      <dt className="shrink-0 text-muted-foreground">{label}</dt>
+      <dd className="min-w-0 text-right break-all">{children}</dd>
+    </div>
+  );
+}
+
+/** Webhook deliveries and Shiprocket actions for this order, newest first. */
+function ShiprocketLogPanel({ orderId }: { orderId: string }) {
+  const logs = useQuery({
+    queryKey: ["admin", "shiprocket-logs", orderId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("shiprocket_logs")
+        .select("id, kind, outcome, message, shiprocket_status, created_at")
+        .eq("order_id", orderId)
+        .order("created_at", { ascending: false })
+        .limit(30);
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+  if (!logs.data?.length) return null;
+  return (
+    <Panel title="Shiprocket activity" className="lg:col-span-3">
+      <ol className="space-y-2 text-sm">
+        {logs.data.map((l) => (
+          <li key={l.id} className="flex flex-col gap-1 sm:flex-row sm:gap-3">
+            <span className="w-44 shrink-0 text-muted-foreground">
+              {formatDateTime(l.created_at)}
+            </span>
+            <span className="min-w-0">
+              <StatusPill
+                tone={l.outcome === "error" ? "bad" : l.outcome === "ok" ? "good" : "neutral"}
+              >
+                {l.kind} · {l.outcome}
+              </StatusPill>{" "}
+              {l.shiprocket_status && (
+                <strong className="font-medium">{l.shiprocket_status} </strong>
+              )}
+              <span className={cn("break-words", l.outcome === "error" && "text-destructive")}>
+                {l.message}
+              </span>
+            </span>
+          </li>
+        ))}
+      </ol>
+    </Panel>
   );
 }

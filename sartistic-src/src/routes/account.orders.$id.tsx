@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { formatDate, formatPrice, titleCase } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { OrderTracker, useTrackingRefresh } from "@/components/site/OrderTracker";
+import { ReturnsRefunds } from "@/components/site/ReturnsRefunds";
 
 // Poll for up to 3 minutes after checkout while the payment is confirmed
 // (by the verification call or, as a fallback, the Razorpay webhook).
@@ -101,6 +102,8 @@ function OrderDetail() {
         <p className="eyebrow mb-8">Order tracking</p>
         <OrderTracker order={data} />
       </div>
+
+      <ReturnsRefunds order={data} />
 
       <div className="mt-10 grid gap-10 md:grid-cols-2">
         <div>

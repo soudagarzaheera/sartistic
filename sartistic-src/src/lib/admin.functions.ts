@@ -7,7 +7,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
  * then the role is read from public.user_roles via has_role() — never from
  * anything the browser sends. Every admin server function uses this.
  */
-const requireAdmin = createMiddleware({ type: "function" })
+export const requireAdmin = createMiddleware({ type: "function" })
   .middleware([requireSupabaseAuth])
   .server(async ({ next, context }) => {
     const { data, error } = await context.supabase.rpc("has_role", {
