@@ -81,6 +81,15 @@ const FAQS = [
 ];
 
 /**
+ * Instagram reels shown below "Our Story". Set here in code only (not editable
+ * from the admin dashboard). Paste up to three reel links, e.g.
+ * "https://www.instagram.com/reel/ABC123xyz/". The section is hidden while empty.
+ */
+const INSTAGRAM_REELS: string[] = [
+  "https://www.instagram.com/reel/DYoeKYfoGDb/?evlk=MXI1bzF2ZTh1NTN1Zg==",
+];
+
+/**
  * Built-in defaults, used for any field the admin leaves blank and as the
  * full layout if the homepage_sections table isn't available.
  */
@@ -220,15 +229,78 @@ function Home() {
         content: {},
       }));
 
+  // The reels are fixed in code: they always sit right after "Our Story", or at
+  // the story's usual spot if the story section is hidden.
+  const storyRank = DEFAULT_ORDER.indexOf("story");
+  let reelsAt = layout.findIndex((s) => s.key === "story") + 1;
+  if (reelsAt === 0) {
+    reelsAt = layout.findIndex((s) => DEFAULT_ORDER.indexOf(s.key) > storyRank);
+    if (reelsAt === -1) reelsAt = layout.length;
+  }
+
   return (
     <>
-      {layout.map((s) => {
+      {layout.map((s, i) => {
         const content = { ...(s.content ?? {}) };
         const fallback = DEFAULTS[s.key] ?? {};
         const Section = SECTIONS[s.key];
-        return Section ? <Section key={s.key} c={content} d={fallback} /> : null;
+        return (
+          <Fragment key={s.key}>
+            {i === reelsAt && <ReelsSection />}
+            {Section ? <Section c={content} d={fallback} /> : null}
+          </Fragment>
+        );
       })}
+      {reelsAt === layout.length && <ReelsSection />}
     </>
+  );
+}
+
+/** Turns an Instagram reel/post link into its embeddable URL, or null if it isn't one. */
+function instagramEmbedUrl(link: string): string | null {
+  const m = link.match(/instagram\.com\/(?:[^/?#]+\/)?(?:reels?|p|tv)\/([A-Za-z0-9_-]+)/);
+  return m ? `https://www.instagram.com/reel/${m[1]}/embed` : null;
+}
+
+function ReelsSection() {
+  const embeds = INSTAGRAM_REELS.map((x) => instagramEmbedUrl(x.trim()))
+    .filter((x): x is string => Boolean(x))
+    .slice(0, 3);
+  if (embeds.length === 0) return null;
+
+  return (
+    <section className="bg-card py-24">
+      <div className="mx-auto max-w-[1400px] px-5 lg:px-10">
+        <Reveal>
+          <SectionHeading
+            eyebrow="On Instagram"
+            title="Watch the Artistry"
+            subtitle="Mehndi in motion: designs, application and colour reveals."
+          />
+        </Reveal>
+        <div className="mx-auto mt-12 flex max-w-5xl flex-wrap justify-center gap-6">
+          {embeds.map((src, i) => (
+            <Reveal key={i} delay={i * 80} className="w-full max-w-[400px] md:w-[calc((100%-3rem)/3)]">
+              <iframe
+                src={src}
+                title={`SARTISTIC Instagram reel ${i + 1}`}
+                loading="lazy"
+                allowFullScreen
+                scrolling="no"
+                className="mx-auto h-[640px] w-full max-w-[400px] border border-border bg-background"
+              />
+            </Reveal>
+          ))}
+        </div>
+        <div className="mt-12 text-center">
+          <Button asChild variant="outline" className="h-12 rounded-none px-8">
+            <a href="https://www.instagram.com/sartistic02" target="_blank" rel="noreferrer">
+              Follow on Instagram <ArrowRight className="ml-2 size-4" />
+            </a>
+          </Button>
+        </div>
+      </div>
+    </section>
   );
 }
 

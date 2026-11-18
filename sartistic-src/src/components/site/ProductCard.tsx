@@ -95,10 +95,13 @@ export function ProductCard({
           </Link>
           <div className="text-right">
             <p className="text-sm">{formatPrice(product.price)}</p>
-            {product.compare_at_price && (
-              <p className="text-xs text-muted-foreground line-through">
-                {formatPrice(product.compare_at_price)}
-              </p>
+            {off && (
+              <>
+                <p className="text-xs text-muted-foreground line-through">
+                  {formatPrice(product.compare_at_price)}
+                </p>
+                <p className="text-[0.65rem] text-accent">{off}% discount</p>
+              </>
             )}
           </div>
         </div>

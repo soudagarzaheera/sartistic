@@ -202,17 +202,17 @@ function ProductPage() {
             </div>
           )}
 
-          <div className="mt-6 flex items-end gap-3">
+          <div className="mt-6">
             <span className="font-display text-3xl">{formatPrice(price)}</span>
-            {product.compare_at_price && Number(product.compare_at_price) > price && (
-              <span className="text-muted-foreground line-through">
-                {formatPrice(product.compare_at_price)}
-              </span>
-            )}
             {off && (
-              <span className="bg-accent px-2 py-1 text-[0.6rem] tracking-[0.18em] text-accent-foreground uppercase">
-                {off}% off
-              </span>
+              <div className="mt-1 flex items-center gap-3">
+                <span className="text-muted-foreground line-through">
+                  {formatPrice(product.compare_at_price)}
+                </span>
+                <span className="bg-accent px-2 py-1 text-[0.6rem] tracking-[0.18em] text-accent-foreground uppercase">
+                  Available at {off}% discount
+                </span>
+              </div>
             )}
           </div>
 
