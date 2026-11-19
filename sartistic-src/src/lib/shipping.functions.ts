@@ -114,9 +114,8 @@ export const createShiprocketShipment = createServerFn({ method: "POST" })
     }
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { shiprocketRequest, buildShipmentPayload, ShiprocketApiError } = await import(
-      "@/lib/shiprocket.server"
-    );
+    const { shiprocketRequest, buildShipmentPayload, ShiprocketApiError, getShiprocketToken } =
+      await import("@/lib/shiprocket.server");
 
     const { data: order, error } = await supabaseAdmin
       .from("orders")
@@ -150,6 +149,17 @@ export const createShiprocketShipment = createServerFn({ method: "POST" })
 
     // Validate before claiming, so a bad phone number doesn't hold the claim.
     const payload = buildShipmentPayload(order, pickupLocation, data);
+
+    // Log in before claiming: a login failure means nothing was sent, so it
+    // must not be reported as "outcome unknown" or hold the 10-minute claim.
+    try {
+      await getShiprocketToken();
+    } catch (err) {
+      console.error("[shiprocket] Authentication failed before creating shipment:", err);
+      throw new Error(
+        `Shiprocket login failed, so no shipment was created: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
 
     const staleBefore = new Date(Date.now() - SHIPMENT_CLAIM_MS).toISOString();
     const { data: claimed, error: claimError } = await supabaseAdmin

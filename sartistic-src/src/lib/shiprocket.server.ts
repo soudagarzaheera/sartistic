@@ -30,8 +30,16 @@ const password = process.env["SHIPROCKET_PASSWORD"];
   );
 
   if (!response.ok) {
+    const text = await response.text().catch(() => "");
+    let detail = text.slice(0, 200);
+    try {
+      const parsed = JSON.parse(text) as { message?: unknown };
+      if (parsed?.message) detail = String(parsed.message);
+    } catch {
+      // keep raw text
+    }
     throw new Error(
-      `Shiprocket authentication failed: ${response.status}`
+      `Shiprocket authentication failed: ${response.status}${detail ? ` (${detail})` : ""}`
     );
   }
 
